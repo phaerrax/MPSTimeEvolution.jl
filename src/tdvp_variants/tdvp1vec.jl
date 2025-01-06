@@ -196,14 +196,8 @@ function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number, sites; kwarg
             )
         end
 
-        !isnothing(pbar) && ProgressMeter.next!(
-            pbar;
-            showvalues=[
-                ("t", current_time),
-                ("Δt step time", round(stime; digits=3)),
-                ("Max bond-dim", maxlinkdim(state)),
-            ],
-        )
+        !isnothing(pbar) &&
+            ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
 
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0

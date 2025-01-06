@@ -222,12 +222,7 @@ function adjtdvp1vec!(
         current_time += Δt
 
         !isnothing(pbar) && ProgressMeter.next!(
-            pbar;
-            showvalues=[
-                ("t", current_time),
-                ("Δt step time", round(stime; digits=3)),
-                ("Max bond-dim", maxlinkdim(operator)),
-            ],
+            pbar; showvalues=simulationinfo(operator, current_time, stime)
         )
 
         # We actually want to measure (i.e. contract the MPS) not at each time step, but
@@ -442,12 +437,7 @@ function adaptiveadjtdvp1vec!(
         current_time += Δt
 
         !isnothing(pbar) && ProgressMeter.next!(
-            pbar;
-            showvalues=[
-                ("t", current_time),
-                ("Δt step time", round(stime; digits=3)),
-                ("Max bond-dim", maxlinkdim(operator)),
-            ],
+            pbar; showvalues=simulationinfo(operator, current_time, stime)
         )
 
         # We actually want to measure (i.e. contract the MPS) not at each time step, but

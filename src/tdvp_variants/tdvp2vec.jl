@@ -128,14 +128,8 @@ function tdvp2vec!(state, L::MPO, dt, tf; kwargs...)
             end
         end
 
-        !isnothing(pbar) && ProgressMeter.next!(
-            pbar;
-            showvalues=[
-                ("t", dt * s),
-                ("dt step time", round(stime; digits=3)),
-                ("Max bond-dim", maxlinkdim(state)),
-            ],
-        )
+        !isnothing(pbar) &&
+            ProgressMeter.next!(pbar; showvalues=simulationinfo(state, dt * s, stime))
 
         if !isempty(measurement_ts(cb)) && dt * s ≈ measurement_ts(cb)[end]
             if store_initstate

@@ -166,14 +166,8 @@ function tdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kwargs...)
             end
         end
 
-        !isnothing(pbar) && ProgressMeter.next!(
-            pbar;
-            showvalues=[
-                ("t", current_time),
-                ("Δt step time", round(stime; digits=3)),
-                ("Max bond-dim", maxlinkdim(state)),
-            ],
-        )
+        !isnothing(pbar) &&
+            ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
 
         current_time += timestep
 
@@ -337,14 +331,8 @@ function adaptivetdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kw
             end
         end
 
-        !isnothing(pbar) && ProgressMeter.next!(
-            pbar;
-            showvalues=[
-                ("t", current_time),
-                ("Δt step time", round(stime; digits=3)),
-                ("Max bond-dim", maxlinkdim(state)),
-            ],
-        )
+        !isnothing(pbar) &&
+            ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
 
         current_time += timestep
 

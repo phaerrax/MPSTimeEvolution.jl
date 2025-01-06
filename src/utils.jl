@@ -226,3 +226,32 @@ function append_if_not_null(filename::AbstractString, str::AbstractString)
         return filename
     end
 end
+
+function simulationinfo(x::MPS, current_time, stime; digits=3)
+    return () -> [
+        ("t", current_time),
+        ("Maximum bond dimension", maxlinkdim(x)),
+        ("Wall time / step", round(stime; digits=digits)),
+        ("MPS size / MiB", round(Base.summarysize(x) / (2^20); digits=digits)),
+        # ↖ amount of memory, in bytes, used by all unique objects reachable from x
+        ("GC live / MiB", round(Base.gc_live_bytes() / (2^20); digits=digits)),
+        # ↖ total size of objects currently in memory
+        ("JIT / MiB", round(Base.jit_total_bytes() / (2^20); digits=digits)),
+        # ↖ total amount allocated by the just-in-time compiler
+        ("Max. RSS / GiB", round(Sys.maxrss() / (2^30); digits=digits)),
+        # ↖ maximum resident set size utilized (i.e. the maximum amount of memory
+        # that the job may occupy)
+    ]
+end
+
+function simulationinfo(x::Vector{MPS}, current_time, stime; digits=3)
+    return () -> [
+        ("t", current_time),
+        ("Maximum bond dimensions", maxlinkdim.(x)),
+        ("Wall time / step", round(stime; digits=digits)),
+        ("MPS sizes / MiB", round.(Base.summarysize.(x) ./ (2^20); digits=digits)),
+        ("GC live / MiB", round(Base.gc_live_bytes() / (2^20); digits=digits)),
+        ("JIT / MiB", round(Base.jit_total_bytes() / (2^20); digits=digits)),
+        ("Max. RSS / GiB", round(Sys.maxrss() / (2^30); digits=digits)),
+    ]
+end

@@ -186,12 +186,7 @@ function jointtdvp1!(
         end
 
         !isnothing(pbar) && ProgressMeter.next!(
-            pbar;
-            showvalues=[
-                ("t", current_time),
-                ("Δt step time", round(stime; digits=3)),
-                ("Max bond-dim", maximum(maxlinkdim.(states))),
-            ],
+            pbar; showvalues=simulationinfo(states, current_time, stime)
         )
 
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
