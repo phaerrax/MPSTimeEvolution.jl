@@ -185,13 +185,26 @@ function adjtdvp1vec!(
 
     N = length(operator)
 
+    # Measure everthing once in the initial state.
+    current_time = zero(Δt)
+    prev_t = zero(Δt)
+
+    data = [current_time]
+    expvals = [inner(s, operator) for s in initialstates]
+    for x in expvals
+        push!(data, real(x), imag(x))
+    end
+    println(io_handle, join(data, ","))
+    flush(io_handle)
+
+    println(ranks_handle, join([current_time; linkdims(operator)], ","))
+    flush(ranks_handle)
+
     # Prepare for first iteration.
     orthogonalize!(operator, 1)
     set_nsite!(PH, 1)
     position!(PH, operator, 1)
 
-    current_time = zero(Δt)
-    prev_t = zero(Δt)
     for s in 1:nsteps
         stime = @elapsed begin
             # In TDVP1 only one site at a time is modified, so we iterate on the sites
