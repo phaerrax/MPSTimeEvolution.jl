@@ -181,13 +181,13 @@ function recompute!(P::ProjMPOSum, v::MPS, n::Int)
 end
 
 """
-    maxlinkdims(v::MPS, maxbonddim::Int)::Vector{Int}
+    maxlinkdims(v::MPS[, maxbonddim])
 
 Return a vector containing the maximum bond dimensions that the MPS `v` can have, taking
-into account both the physical dimension of its sites and a manually set upper bound
-`maxbonddim`. The function assumes that all sites share the same physical dimension.
+into account both the physical dimension of its sites and (if provided) a manually set upper
+bound `maxbonddim`. The function assumes that all sites share the same physical dimension.
 """
-function maxlinkdims(v::MPS, maxbonddim::Int)::Vector{Int}
+function maxlinkdims(v::MPS)
     # Naive method:
     #   dims = dim.(siteinds(only, v)) .^ (1:length(v))
     #   return min.(min.(dims, reverse(dims)), Ref(maxdim))
@@ -196,9 +196,23 @@ function maxlinkdims(v::MPS, maxbonddim::Int)::Vector{Int}
     # Once we cap the values at `maxbonddim`, we can safely exponentiate.
     sitedims = dim.(siteinds(only, v))
     logdims = (1:length(v)) .* log2.(sitedims)
-    cappedlogdims =
-        min.(
-            min.(logdims[1:(end - 1)], reverse(logdims[1:(end - 1)])), Ref(log2(maxbonddim))
-        )
-    return Int.(round.(2 .^ cappedlogdims))
+    minlogdims = min.(logdims[1:(end - 1)], reverse(logdims[1:(end - 1)]))
+    return round.(Int, 2 .^ minlogdims)
 end
+
+maxlinkdims(v::MPS, maxbonddim::Int) = min.(maxlinkdims(v), Ref(maxbonddim))
+
+"""
+    maxlinkdims(st::AbstractString, N[, maxbonddim])
+
+Return a vector containing the maximum bond dimensions that an MPS of site type `st` and
+length `N` can have, taking into account both the physical dimension of its sites and (if
+provided) a manually set upper bound `maxbonddim`.
+"""
+function maxlinkdims(st::AbstractString, N)
+    logdims = (1:N) .* log2(space(SiteType(st)))
+    minlogdims = min.(logdims[1:(end - 1)], reverse(logdims[1:(end - 1)]))
+    return round.(Int, 2 .^ minlogdims)
+end
+
+maxlinkdims(st::AbstractString, N, maxbonddim) = min.(maxlinkdims(st, N), Ref(maxbonddim))
