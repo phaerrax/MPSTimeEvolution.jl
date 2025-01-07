@@ -1,7 +1,7 @@
 # some extensions for ITensors functionality
 # the goal is to eventually contribute these upstream if found appropriate
 
-export growbond!, recompute!, maxlinkdims, stretchBondDim, growMPS, growMPS!
+export growbond!, recompute!, maxlinkdims, stretchBondDim, growMPS, growMPS!, enlargelinks
 
 using ITensorMPS: setleftlim!, setrightlim!, AbstractProjMPO, linkdims
 
@@ -108,6 +108,76 @@ of `d` on each of its bonds.
 Return the overlap of the new MPS with the original one.
 """
 growMPS!(v::MPS, d::Integer) = growMPS!(v, fill(d, length(v) - 1))
+
+"""
+    enlargelinks(v, dims; ref_state)
+
+Increase the bond dimensions of the MPS `v` to `dims` by adding an all-zero MPS to it,
+with a direct sum. The result is an MPS orthogonalized on the first site whose maximum bond
+dimensions are `dims`, except possibly at its edges, where the bond dimension is naturally
+lower.
+
+In order to obtain the all-zero MPS, a random MPS with the given bond dimensions is
+computed, so that the correct link structure is maintained; it is then multiplied by zero
+and added to `v`.
+
+If the MPS has some conserved quantum numbers, then a product state must also be supplied
+as the keyword argument `ref_state`, because the random MPS is obtained by randomising this
+initial state (which also determines the total QN of the resulting random MPS).
+This argument may take the form of one of the many available ways to build an MPS from the
+`MPS(sites, ...)` function, such as a string, an array of strings, or a function.
+
+# Examples
+
+Without quantum numbers:
+
+```julia-repl
+julia> N = 9; s = siteinds("Fermion", N);
+
+julia> v = MPS(s, "Emp");
+
+julia> v_ext = enlargelinks(v, 10; ref_state="Emp");
+
+julia> print(linkdims(v_ext))
+[2, 4, 8, 10, 10, 8, 4, 2]
+```
+
+With quantum numbers:
+
+```julia-repl
+julia> N = 9; s = siteinds("Fermion", N; conserve_nfparity=true);
+
+julia> v = MPS(s, n -> isodd(n) ? "Occ" : "Emp");
+
+julia> v_ext = enlargelinks(v, 10; ref_state=n -> isodd(n) ? "Occ" : "Emp");
+
+julia> print(linkdims(v_ext))
+[1, 2, 4, 8, 10, 8, 4, 2]
+```
+"""
+function enlargelinks(v, dims::Vector{<:Integer}; ref_state=nothing)
+    diff_linkdims = max.(dims .- linkdims(v), 1)
+    x = if hasqns(first(v))
+        if isnothing(ref_state)
+            error("Initial state required to use enlargelinks with QNs")
+        else
+            random_mps(siteinds(v), ref_state; linkdims=diff_linkdims)
+        end
+    else
+        random_mps(siteinds(v); linkdims=diff_linkdims)
+    end
+    orthogonalize!(x, 1)
+    v_ext = add(orthogonalize(v, 1), 0 * x; alg="directsum")
+    orthogonalize!(v_ext, length(v_ext))
+    return orthogonalize(v_ext, 1)
+end
+
+function enlargelinks(v, dim::Integer; kwargs...)
+    return enlargelinks(v, fill(dim, length(v) - 1); kwargs...)
+end
+
+# TODO deprecate `growMPS` and its siblings? They don't really do exactly the same thing,
+# but realistically `enlargelinks` is safer to use...
 
 """
     recompute!(P::AbstractProjMPO, psi::MPS, n::Int)
