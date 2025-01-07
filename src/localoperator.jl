@@ -14,7 +14,7 @@ struct LocalOperator
     # integers are unique, there can be at most one operator per site, but the same
     # operator (i.e. the same string) can be repeated on more sites.
     # The dictionary is sorted for later convenience.
-    LocalOperator(d) = new(sort(d))
+    LocalOperator(d) = new(sort(OrderedDict(d)))
 end
 
 factors(op::LocalOperator) = values(op.terms)
