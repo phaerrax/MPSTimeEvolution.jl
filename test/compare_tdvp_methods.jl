@@ -63,8 +63,7 @@ function siam_tdvp1vec(; dt, tmax, N)
         state_0,
         L,
         dt,
-        tmax,
-        sites;
+        tmax;
         hermitian=false,
         normalize=false,
         callback=cb,
@@ -104,8 +103,7 @@ function siam_adjtdvp1vec(; dt, tmax, N)
         adjL,
         dt,
         tmax,
-        dt,
-        sites;
+        dt;
         hermitian=false,
         normalize=false,
         progress=true,
@@ -130,8 +128,7 @@ function siam_adjtdvp1vec(; dt, tmax, N)
         adjL,
         dt,
         tmax,
-        dt,
-        sites;
+        dt;
         hermitian=false,
         normalize=false,
         progress=true,

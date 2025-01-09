@@ -144,7 +144,7 @@ function printoutput_data(io_handle, cb, psi::MPS; kwargs...)
                 push!(data, real(dot(identity_sf(SiteType("Fermion"), siteinds(psi)), psi)))
             else
                 # TODO Use built-in trace function, do not create an MPS from scratch each time!
-                push!(data, real(inner(MPS(kwargs[:sites], "vecId"), psi)))
+                push!(data, real(inner(MPS(siteinds(psi), "vId"), psi)))
             end
         else
             push!(data, norm(psi))
@@ -182,8 +182,8 @@ function printoutput_data(io_handle, cb, state1::MPS, state2::MPS; kwargs...)
         isvectorized = get(kwargs, :vectorized, false)
         if isvectorized
             # TODO Use built-in trace function, do not create an MPS from scratch each time!
-            vecId = MPS(kwargs[:sites], "vecId")
-            push!(data, real(inner(vecId, state1)), real(inner(vecId, state2)))
+            id = MPS(siteinds(state1), "vId")
+            push!(data, real(inner(id, state1)), real(inner(id, state2)))
         else
             push!(data, norm(state1), norm(state2))
         end

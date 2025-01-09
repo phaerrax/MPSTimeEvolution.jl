@@ -4,7 +4,7 @@ using ITensors: permute
 using ITensorMPS: position!, set_nsite!, check_hascommoninds
 
 """
-    tdvp1vec!(solver, ρ::MPS, L::Vector{MPO}, Δt::Number, tf::Number, sites; kwargs...)
+    tdvp1vec!(solver, ρ::MPS, L::Vector{MPO}, Δt::Number, tf::Number; kwargs...)
 
 Integrate the equation of motion ``d/dt ρₜ = Lᵢ(ρₜ)`` using the one-site TDVP algorithm,
 where `ρ` represents the state of the system and the elements of `L` form… in some way… the
@@ -20,7 +20,6 @@ of motion can be a more general master equation such as the GKSL one.
 - `L::Vector{MPO}`: a list of MPOs.
 - `Δt::Number`: time step of the evolution.
 - `tf::Number`: end time of the evolution.
-- `sites`: a collection of sites, on which `ρ` and `L` are defined.
 
 # Implementation
 For vectorized state it is still unclear whether the measurements can be made before
@@ -29,7 +28,7 @@ postpones the measurements of all observables until all the sites of the state a
 updated.
 """
 function tdvp1vec!(
-    solver, psi0::MPS, Ls::Vector{MPO}, time_step::Number, tf::Number, sites; kwargs...
+    solver, psi0::MPS, Ls::Vector{MPO}, time_step::Number, tf::Number; kwargs...
 )
     # (Copied from ITensorsTDVP)
     for L in Ls
@@ -38,11 +37,11 @@ function tdvp1vec!(
     end
     Ls .= permute.(Ls, Ref((linkind, siteinds, linkind)))
     PLs = ProjMPOSum(Ls)
-    return tdvp1vec!(solver, psi0, PLs, time_step, tf, sites; kwargs...)
+    return tdvp1vec!(solver, psi0, PLs, time_step, tf; kwargs...)
 end
 
 """
-    tdvp1vec!(solver, ρ::MPS, L::MPO, Δt::Number, tf::Number, sites; kwargs...)
+    tdvp1vec!(solver, ρ::MPS, L::MPO, Δt::Number, tf::Number; kwargs...)
 
 Integrate the equation of motion ``d/dt ρₜ = L(ρₜ)`` using the one-site TDVP algorithm,
 where `ρ` represents the state of the system and `L` the evolution operator.
@@ -57,7 +56,6 @@ of motion can be a more general master equation such as the GKSL one.
 - `L::MPO`: the evolution operator.
 - `Δt::Number`: time step of the evolution.
 - `tf::Number`: end time of the evolution.
-- `sites`: a collection of sites, on which `ρ` and `L` are defined.
 
 # Implementation
 For vectorized state it is still unclear whether the measurements can be made before
@@ -65,12 +63,12 @@ the sweep is complete. Therefore, until this question gets an answer, this funct
 postpones the measurements of all observables until all the sites of the state are
 updated.
 """
-function tdvp1vec!(solver, state::MPS, L::MPO, Δt::Number, tf::Number, sites; kwargs...)
-    return tdvp1vec!(solver, state, ProjMPO(L), Δt, tf, sites; kwargs...)
+function tdvp1vec!(solver, state::MPS, L::MPO, Δt::Number, tf::Number; kwargs...)
+    return tdvp1vec!(solver, state, ProjMPO(L), Δt, tf; kwargs...)
 end
 
 """
-    tdvp1vec!(solver, ρ::MPS, L, Δt::Number, tf::Number, sites; kwargs...)
+    tdvp1vec!(solver, ρ::MPS, L, Δt::Number, tf::Number; kwargs...)
 
 Integrate the equation of motion ``d/dt ρₜ = ℒ(ρₜ)`` using the one-site TDVP algorithm,
 where `ρ` represents the state of the system and `L` the evolution operator.
@@ -85,7 +83,6 @@ of motion can be a more general master equation such as the GKSL one.
 - `L`: a ProjMPO-like object encoding the evolution operator.
 - `Δt::Number`: time step of the evolution.
 - `tf::Number`: end time of the evolution.
-- `sites`: a collection of sites, on which `ρ` and `L` are defined.
 
 # Implementation
 For vectorized state it is still unclear whether the measurements can be made before
@@ -93,7 +90,7 @@ the sweep is complete. Therefore, until this question gets an answer, this funct
 postpones the measurements of all observables until all the sites of the state are
 updated.
 """
-function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number, sites; kwargs...)
+function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwargs...)
     nsteps = Int(tf / Δt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, false)
@@ -140,11 +137,9 @@ function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number, sites; kwarg
         )
     end
     if store_state0
-        printoutput_data(
-            io_handle, cb, state; psi0=state0, vectorized=true, sites=sites, kwargs...
-        )
+        printoutput_data(io_handle, cb, state; psi0=state0, vectorized=true, kwargs...)
     else
-        printoutput_data(io_handle, cb, state; vectorized=true, sites=sites, kwargs...)
+        printoutput_data(io_handle, cb, state; vectorized=true, kwargs...)
     end
     printoutput_ranks(ranks_handle, cb, state)
 
@@ -202,18 +197,10 @@ function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number, sites; kwarg
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0
                 printoutput_data(
-                    io_handle,
-                    cb,
-                    state;
-                    psi0=state0,
-                    vectorized=true,
-                    sites=sites,
-                    kwargs...,
+                    io_handle, cb, state; psi0=state0, vectorized=true, kwargs...
                 )
             else
-                printoutput_data(
-                    io_handle, cb, state; vectorized=true, sites=sites, kwargs...
-                )
+                printoutput_data(io_handle, cb, state; vectorized=true, kwargs...)
             end
             printoutput_ranks(ranks_handle, cb, state)
             printoutput_stime(times_handle, stime)
@@ -230,7 +217,7 @@ function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number, sites; kwarg
 end
 
 """
-    adaptivetdvp1vec!(solver, state::MPS, H::MPO, Δt::Number, tf::Number, sites; kwargs...)
+    adaptivetdvp1vec!(solver, state::MPS, H::MPO, Δt::Number, tf::Number; kwargs...)
 
 Like `tdvp1vec!`, but grows the bond dimensions of the MPS along the time evolution until
 a certain convergence criterium is met.
@@ -238,7 +225,7 @@ a certain convergence criterium is met.
 See [`tdvp1vec!`](@ref).
 """
 function adaptivetdvp1vec!(
-    solver, psi0::MPS, Ls::Vector{MPO}, time_step::Number, tf::Number, sites; kwargs...
+    solver, psi0::MPS, Ls::Vector{MPO}, time_step::Number, tf::Number; kwargs...
 )
     # (Copied from ITensorsTDVP)
     for H in Hs
@@ -247,32 +234,30 @@ function adaptivetdvp1vec!(
     end
     Hs .= permute.(Hs, Ref((linkind, siteinds, linkind)))
     PHs = ProjMPOSum(Hs)
-    return tdvp1vec!(solver, psi0, PHs, time_step, tf, sites; kwargs...)
+    return tdvp1vec!(solver, psi0, PHs, time_step, tf; kwargs...)
 end
 
 """
-    adaptivetdvp1vec!(solver, state::MPS, L::MPO, Δt::Number, tf::Number, sites; kwargs...)
+    adaptivetdvp1vec!(solver, state::MPS, L::MPO, Δt::Number, tf::Number; kwargs...)
 
 Like `tdvp1vec!`, but grows the bond dimensions of the MPS along the time evolution until
 a certain convergence criterium is met.
 
 See [`tdvp1vec!`](@ref).
 """
-function adaptivetdvp1vec!(
-    solver, state::MPS, L::MPO, Δt::Number, tf::Number, sites; kwargs...
-)
-    return adaptivetdvp1vec!(solver, state, ProjMPO(L), Δt, tf, sites; kwargs...)
+function adaptivetdvp1vec!(solver, state::MPS, L::MPO, Δt::Number, tf::Number; kwargs...)
+    return adaptivetdvp1vec!(solver, state, ProjMPO(L), Δt, tf; kwargs...)
 end
 
 """
-    adaptivetdvp1vec!(solver, state::MPS, L, Δt::Number, tf::Number, sites; kwargs...)
+    adaptivetdvp1vec!(solver, state::MPS, L, Δt::Number, tf::Number; kwargs...)
 
 Like `tdvp1vec!`, but grows the bond dimensions of the MPS along the time evolution until
 a certain convergence criterium is met.
 
 See [`tdvp1vec!`](@ref).
 """
-function adaptivetdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number, sites; kwargs...)
+function adaptivetdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwargs...)
     nsteps = Int(tf / Δt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, true)
@@ -321,11 +306,9 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number, site
         )
     end
     if store_state0
-        printoutput_data(
-            io_handle, cb, state; psi0=state0, vectorized=true, sites=sites, kwargs...
-        )
+        printoutput_data(io_handle, cb, state; psi0=state0, vectorized=true, kwargs...)
     else
-        printoutput_data(io_handle, cb, state; vectorized=true, sites=sites, kwargs...)
+        printoutput_data(io_handle, cb, state; vectorized=true, kwargs...)
     end
     printoutput_ranks(ranks_handle, cb, state)
 
@@ -391,18 +374,10 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number, site
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0
                 printoutput_data(
-                    io_handle,
-                    cb,
-                    state;
-                    psi0=state0,
-                    vectorized=true,
-                    sites=sites,
-                    kwargs...,
+                    io_handle, cb, state; psi0=state0, vectorized=true, kwargs...
                 )
             else
-                printoutput_data(
-                    io_handle, cb, state; vectorized=true, sites=sites, kwargs...
-                )
+                printoutput_data(io_handle, cb, state; vectorized=true, kwargs...)
             end
             printoutput_ranks(ranks_handle, cb, state)
             printoutput_stime(times_handle, stime)
