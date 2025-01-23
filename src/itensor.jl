@@ -168,8 +168,7 @@ function enlargelinks(v, dims::Vector{<:Integer}; ref_state=nothing)
     end
     orthogonalize!(x, 1)
     v_ext = add(orthogonalize(v, 1), 0 * x; alg="directsum")
-    orthogonalize!(v_ext, length(v_ext))
-    return orthogonalize(v_ext, 1)
+    return v_ext
 end
 
 function enlargelinks(v, dim::Integer; kwargs...)
