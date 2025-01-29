@@ -4,94 +4,58 @@ using ITensors: permute
 using ITensorMPS: position!, set_nsite!, check_hascommoninds
 
 """
-    tdvp1vec!(solver, ρ::MPS, L::Vector{MPO}, Δt::Number, tf::Number; kwargs...)
+    tdvp1vec!([solver,] state::MPS, L::MPO, dt, tmax; kwargs...)
+    tdvp1vec!([solver,] state::MPS, L::Vector{MPO}, dt, tmax; kwargs...)
 
-Integrate the equation of motion ``d/dt ρₜ = Lᵢ(ρₜ)`` using the one-site TDVP algorithm,
-where `ρ` represents the state of the system and the elements of `L` form… in some way… the
-evolution operator.
-The state `ρ` is assumed to be a density matrix in a vectorized form, so that the equation
-of motion can be a more general master equation such as the GKSL one.
+Integrate the equation of motion ``d/dt ρₜ = L(ρₜ)`` using the one-site TDVP algorithm, from
+`0` to `tmax` in time steps of `dt`. 
+The MPS `state` represents ``ρ`` in a vectorised form.
+The evolution operator can be given either as a single MPO or as a vector of MPOs, in the
+latter case the evolution operator is taken to be the sum of the elements in the vector.
 
-# Arguments
-- `solver`: a function which takes three arguments `A`, `t`, `B` (and possibly other keyword
+# Other arguments
+
+* `solver`: a function which takes three arguments `A`, `t`, `B` (and possibly other keyword
     arguments) where `t` is a time step, `B` an ITensor and `A` a linear operator on `B`,
-    returning the time-evolved `B`.
-- `ρ::MPS`: the state of the system.
-- `L::Vector{MPO}`: a list of MPOs.
-- `Δt::Number`: time step of the evolution.
-- `tf::Number`: end time of the evolution.
+    returning the time-evolved `B`. It defaults to `KrylovKit.exponentiate`.
+* `dt`: time step of the evolution.
+* `tmax`: end time of the evolution.
 
-# Implementation
-For vectorized state it is still unclear whether the measurements can be made before
-the sweep is complete. Therefore, until this question gets an answer, this function
-postpones the measurements of all observables until all the sites of the state are
-updated.
+# Optional keyword arguments
+
+* `cb`: a callback object describing the observables.
+* `hermitian` (default: `false`): whether `L` is an Hermitian operator.
+* `exp_tol` (default: `1e-14`): accuracy per unit time for `KrylovKit.exponentiate`.
+* `krylovdim` (default: `30`): maximum dimension of the Krylov subspace that will be
+    constructed.
+* `maxiter` (default: `100`): number of times the Krylov subspace can be rebuilt.
+* `normalize` (default: `false`): whether `state` is renormalised after each step.
+* `io_file` (default: `nothing`): output file for step-by-step measurements.
+* `io_ranks` (default: `nothing`): output file for step-by-step bond dimensions.
+* `io_times` (default: `nothing`): output file for simulation wall-clock times.
+* `store_psi0` (default: `false`): whether to keep information about the initial state.
+* `which_decomp` (default: `"qr"`): name of the decomposition method for the sweeps.
+* `progress` (default: `true`): whether to display a progress bar during the evolution.
 """
-function tdvp1vec!(
-    solver, psi0::MPS, Ls::Vector{MPO}, time_step::Number, tf::Number; kwargs...
-)
-    # (Copied from ITensorsTDVP)
+function tdvp1vec! end
+
+function tdvp1vec!(solver, state::MPS, Ls::Vector{MPO}, dt, tmax; kwargs...)
+    # This is copied from ITensorsTDVP. Not sure why it's useful...
     for L in Ls
-        check_hascommoninds(siteinds, L, psi0)
-        check_hascommoninds(siteinds, L, psi0')
+        check_hascommoninds(siteinds, L, state)
+        check_hascommoninds(siteinds, L, state')
     end
     Ls .= permute.(Ls, Ref((linkind, siteinds, linkind)))
     PLs = ProjMPOSum(Ls)
-    return tdvp1vec!(solver, psi0, PLs, time_step, tf; kwargs...)
+    return tdvp1vec!(solver, state, PLs, dt, tmax; kwargs...)
 end
 
-"""
-    tdvp1vec!(solver, ρ::MPS, L::MPO, Δt::Number, tf::Number; kwargs...)
-
-Integrate the equation of motion ``d/dt ρₜ = L(ρₜ)`` using the one-site TDVP algorithm,
-where `ρ` represents the state of the system and `L` the evolution operator.
-The state `ρ` is assumed to be a density matrix in a vectorized form, so that the equation
-of motion can be a more general master equation such as the GKSL one.
-
-# Arguments
-- `solver`: a function which takes three arguments `A`, `t`, `B` (and possibly other keyword
-    arguments) where `t` is a time step, `B` an ITensor and `A` a linear operator on `B`,
-    returning the time-evolved `B`.
-- `ρ::MPS`: the state of the system.
-- `L::MPO`: the evolution operator.
-- `Δt::Number`: time step of the evolution.
-- `tf::Number`: end time of the evolution.
-
-# Implementation
-For vectorized state it is still unclear whether the measurements can be made before
-the sweep is complete. Therefore, until this question gets an answer, this function
-postpones the measurements of all observables until all the sites of the state are
-updated.
-"""
-function tdvp1vec!(solver, state::MPS, L::MPO, Δt::Number, tf::Number; kwargs...)
-    return tdvp1vec!(solver, state, ProjMPO(L), Δt, tf; kwargs...)
+function tdvp1vec!(solver, state::MPS, L::MPO, dt, tmax; kwargs...)
+    return tdvp1vec!(solver, state, ProjMPO(L), dt, tmax; kwargs...)
 end
 
-"""
-    tdvp1vec!(solver, ρ::MPS, L, Δt::Number, tf::Number; kwargs...)
-
-Integrate the equation of motion ``d/dt ρₜ = ℒ(ρₜ)`` using the one-site TDVP algorithm,
-where `ρ` represents the state of the system and `L` the evolution operator.
-The state `ρ` is assumed to be a density matrix in a vectorized form, so that the equation
-of motion can be a more general master equation such as the GKSL one.
-
-# Arguments
-- `solver`: a function which takes three arguments `A`, `t`, `B` (and possibly other keyword
-    arguments) where `t` is a time step, `B` an ITensor and `A` a linear operator on `B`,
-    returning the time-evolved `B`.
-- `ρ::MPS`: the state of the system.
-- `L`: a ProjMPO-like object encoding the evolution operator.
-- `Δt::Number`: time step of the evolution.
-- `tf::Number`: end time of the evolution.
-
-# Implementation
-For vectorized state it is still unclear whether the measurements can be made before
-the sweep is complete. Therefore, until this question gets an answer, this function
-postpones the measurements of all observables until all the sites of the state are
-updated.
-"""
-function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwargs...)
-    nsteps = Int(tf / Δt)
+function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
+    nsteps = Int(tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, false)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
@@ -163,8 +127,8 @@ function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwargs...)
                     PH,
                     state,
                     site,
-                    0.5Δt;
-                    current_time=(ha == 1 ? current_time + 0.5Δt : current_time + Δt),
+                    0.5dt;
+                    current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
                     sweepdir=sweepdir,
                     which_decomp=decomp,
                     hermitian=hermitian,
@@ -175,7 +139,7 @@ function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwargs...)
             end
         end
 
-        current_time += Δt
+        current_time += dt
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
@@ -217,15 +181,17 @@ function tdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwargs...)
 end
 
 """
-    adaptivetdvp1vec!(solver, state::MPS, H::MPO, Δt::Number, tf::Number; kwargs...)
+    adaptivetdvp1vec!(solver, state, L, dt, tmax; kwargs...)
 
 Like `tdvp1vec!`, but grows the bond dimensions of the MPS along the time evolution until
 a certain convergence criterium is met.
+The keyword argument `convergence_factor_bonddims`, which defaults to `1e-4`, controls the
+convergence of the adaptation algorithm.
 
-See [`tdvp1vec!`](@ref).
+For an explanation of the other arguments, see [`tdvp1vec!`](@ref).
 """
 function adaptivetdvp1vec!(
-    solver, psi0::MPS, Ls::Vector{MPO}, time_step::Number, tf::Number; kwargs...
+    solver, psi0::MPS, Ls::Vector{MPO}, time_step::Number, tmax::Number; kwargs...
 )
     # (Copied from ITensorsTDVP)
     for H in Hs
@@ -234,31 +200,15 @@ function adaptivetdvp1vec!(
     end
     Hs .= permute.(Hs, Ref((linkind, siteinds, linkind)))
     PHs = ProjMPOSum(Hs)
-    return tdvp1vec!(solver, psi0, PHs, time_step, tf; kwargs...)
+    return tdvp1vec!(solver, psi0, PHs, time_step, tmax; kwargs...)
 end
 
-"""
-    adaptivetdvp1vec!(solver, state::MPS, L::MPO, Δt::Number, tf::Number; kwargs...)
-
-Like `tdvp1vec!`, but grows the bond dimensions of the MPS along the time evolution until
-a certain convergence criterium is met.
-
-See [`tdvp1vec!`](@ref).
-"""
-function adaptivetdvp1vec!(solver, state::MPS, L::MPO, Δt::Number, tf::Number; kwargs...)
-    return adaptivetdvp1vec!(solver, state, ProjMPO(L), Δt, tf; kwargs...)
+function adaptivetdvp1vec!(solver, state::MPS, L::MPO, dt::Number, tmax::Number; kwargs...)
+    return adaptivetdvp1vec!(solver, state, ProjMPO(L), dt, tmax; kwargs...)
 end
 
-"""
-    adaptivetdvp1vec!(solver, state::MPS, L, Δt::Number, tf::Number; kwargs...)
-
-Like `tdvp1vec!`, but grows the bond dimensions of the MPS along the time evolution until
-a certain convergence criterium is met.
-
-See [`tdvp1vec!`](@ref).
-"""
-function adaptivetdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwargs...)
-    nsteps = Int(tf / Δt)
+function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwargs...)
+    nsteps = Int(tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, true)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
@@ -334,8 +284,8 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwar
                     PH,
                     state,
                     site,
-                    0.5Δt;
-                    current_time=(ha == 1 ? current_time + 0.5Δt : current_time + Δt),
+                    0.5dt;
+                    current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
                     sweepdir=sweepdir,
                     which_decomp=decomp,
                     hermitian=hermitian,
@@ -346,7 +296,7 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwar
             end
         end
 
-        current_time += Δt
+        current_time += dt
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
@@ -366,7 +316,7 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, Δt::Number, tf::Number; kwar
             pbar;
             showvalues=[
                 ("t", current_time),
-                ("Δt step time", round(stime; digits=3)),
+                ("dt step time", round(stime; digits=3)),
                 ("Max bond-dim", maxlinkdim(state)),
             ],
         )

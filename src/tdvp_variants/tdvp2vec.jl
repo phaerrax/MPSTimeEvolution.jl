@@ -1,10 +1,10 @@
 """
-    tdvp2vec!(state, L::MPO, dt, tf; kwargs...)
+    tdvp2vec!(state, L::MPO, dt, tmax; kwargs...)
 
-Evolve the MPS `state` using the MPO `H` from 0 to `tf` using an integration step `dt`.
+Evolve the MPS `state` using the MPO `H` from 0 to `tmax` using an integration step `dt`.
 """
-function tdvp2vec!(state, L::MPO, dt, tf; kwargs...)
-    nsteps = Int(tf / dt)
+function tdvp2vec!(state, L::MPO, dt, tmax; kwargs...)
+    nsteps = Int(tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, false) # Lindblad superoperator is not Hermitian
     exp_tol = get(kwargs, :exp_tol, 1e-14)

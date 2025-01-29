@@ -4,70 +4,57 @@ using ITensors: permute
 using ITensorMPS: position!, set_nsite!, check_hascommoninds
 
 """
-    tdvp1!(solver, ψ::MPS, ⃗H::Vector{MPO}, Δt::Number, tf::Number; kwargs...)
+    tdvp1!([solver,] state::MPS, H::Vector{MPO}, dt, tmax; kwargs...)
+    tdvp1!([solver,] state::MPS, H::MPO, dt, tmax; kwargs...)
 
-Integrate the Schrödinger equation ``d/dt ψₜ = -i Hⱼ ψₜ`` using the one-site TDVP algorithm,
-where `ψ` represents the state of the system and the elements of `⃗H` form… in some way… the
-Hamiltonian operator of the system.
+Integrate the Schrödinger equation ``d/dt ψₜ = -i H ψₜ`` using the one-site TDVP algorithm,
+where `state` is an MPS representing the state of the system.
+The Hamiltonian `H` can be given either as a single MPO or as a vector of MPOs, in the
+latter case the total Hamiltonian is taken to be the sum of the elements in the vector.
 
-# Arguments
-- `solver`: a function which takes three arguments `A`, `t`, `B` (and possibly other keyword
+# Other arguments
+
+* `solver`: a function which takes three arguments `A`, `t`, `B` (and possibly other keyword
     arguments) where `t` is a time step, `B` an ITensor and `A` a linear operator on `B`,
-    returning the time-evolved `B`.
-- `ψ::MPS`: the state of the system.
-- `⃗H:Vector{MPO}`: a list of MPOs.
-- `Δt::Number`: time step of the evolution.
-- `tf::Number`: end time of the evolution.
+    returning the time-evolved `B`. It defaults to `KrylovKit.exponentiate`.
+* `dt`: time step of the evolution.
+* `tmax`: end time of the evolution.
+
+# Optional keyword arguments
+
+* `cb`: a callback object describing the observables.
+* `hermitian` (default: `true`): whether `H` is an Hermitian operator.
+* `exp_tol` (default: `1e-14`): accuracy per unit time for `KrylovKit.exponentiate`.
+* `krylovdim` (default: `30`): maximum dimension of the Krylov subspace that will be
+    constructed.
+* `maxiter` (default: `100`): number of times the Krylov subspace can be rebuilt.
+* `normalize` (default: `true`): whether `state` is renormalised after each step.
+* `io_file` (default: `nothing`): output file for step-by-step measurements.
+* `io_ranks` (default: `nothing`): output file for step-by-step bond dimensions.
+* `io_times` (default: `nothing`): output file for simulation wall-clock times.
+* `store_psi0` (default: `false`): whether to keep information about the initial state.
+* `which_decomp` (default: `"qr"`): name of the decomposition method for the sweeps.
+* `progress` (default: `true`): whether to display a progress bar during the evolution.
 """
-function tdvp1!(
-    solver, psi0::MPS, Hs::Vector{MPO}, time_step::Number, tf::Number; kwargs...
-)
+function tdvp1! end
+
+function tdvp1!(solver, state::MPS, Hs::Vector{MPO}, dt, tmax; kwargs...)
     # (Copied from ITensorsTDVP)
     for H in Hs
-        check_hascommoninds(siteinds, H, psi0)
-        check_hascommoninds(siteinds, H, psi0')
+        check_hascommoninds(siteinds, H, state)
+        check_hascommoninds(siteinds, H, state')
     end
     Hs .= permute.(Hs, Ref((linkind, siteinds, linkind)))
     PHs = ProjMPOSum(Hs)
-    return tdvp1!(solver, psi0, PHs, time_step, tf; kwargs...)
+    return tdvp1!(solver, state, PHs, dt, tmax; kwargs...)
 end
 
-"""
-    tdvp1!(solver, ψ::MPS, H::MPO, Δt::Number, tf::Number; kwargs...)
-
-Integrate the Schrödinger equation ``d/dt ψₜ = -i H ψₜ`` using the one-site TDVP algorithm,
-where `ψ` represents the state of the system and the elements of `H` is the Hamiltonian
-operator of the system.
-
-# Arguments
-- `solver`: a function which takes three arguments `A`, `t`, `B` (and possibly other keyword
-    arguments) where `t` is a time step, `B` an ITensor and `A` a linear operator on `B`,
-    returning the time-evolved `B`.
-- `ψ::MPS`: the state of the system.
-- `H::MPO`: the Hamiltonian operator.
-- `tf::Number`: end time of the evolution.
-"""
-function tdvp1!(solver, state::MPS, H::MPO, timestep::Number, tf::Number; kwargs...)
-    return tdvp1!(solver, state, ProjMPO(H), timestep, tf; kwargs...)
+function tdvp1!(solver, state::MPS, H::MPO, dt, tmax; kwargs...)
+    return tdvp1!(solver, state, ProjMPO(H), dt, tmax; kwargs...)
 end
 
-"""
-    tdvp1!(solver, ψ::MPS, ⃗H::Vector{MPO}, Δt::Number, tf::Number; kwargs...)
-
-Integrate the Schrödinger equation ``d/dt ψₜ = -i Hⱼ ψₜ`` using the one-site TDVP algorithm,
-where `ψ` represents the state of the system and the elements of `⃗H` form… in some way… the
-Hamiltonian operator of the system.
-
-# Arguments
-- `solver`: a function which takes three arguments `A`, `t`, `B` (and possibly other keyword
-    arguments) where `t` is a time step, `B` an ITensor and `A` a linear operator on `B`,
-    returning the time-evolved `B`.
-- `ψ::MPS`: the state of the system.
-- `PH`: a ProjMPO-like operator encoding the Hamiltonian operator.
-- `tf::Number`: end time of the evolution.
-"""
-function tdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kwargs...)
-    nsteps = Int(tf / timestep)
+function tdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
+    nsteps = Int(tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, true)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
@@ -86,13 +73,14 @@ function tdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kwargs...)
         pbar = nothing
     end
 
-    # Usually TDVP is used for ordinary time evolution according to a Hamiltonian given
-    # by `H`, and a real-valued time step `timestep`, combined in the evolution operator
-    # U(-itH).
-    # Passing an imaginary time step iτ (and `tf`) as an argument results in an evolution
-    # according to the operator U(-τH), useful for thermalization processes.
-    Δt = im * timestep
-    imag(Δt) == 0 && (Δt = real(Δt)) # Discard imaginary part if time step is real.
+    # Usually TDVP is used for ordinary time evolution, according to a Hamiltonian given
+    # by `H`: if a real-valued time step `dt` is given, we assume this scenario and set up
+    # an evolution given by the operator exp(-itH).
+    # Passing an imaginary time step (and `tmax`) as an argument triggers instead an
+    # evolution according to the operator exp(-tH), useful for thermalization processes.
+    evol_dt = im * dt
+    # Discard the imaginary part if time step is real.
+    imag(evol_dt) == 0 && (evol_dt = real(evol_dt))
 
     store_state0 && (state0 = copy(state))
 
@@ -140,10 +128,8 @@ function tdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kwargs...)
                     PH,
                     state,
                     site,
-                    -0.5Δt; # forward by -im*timestep/2, backwards by im*timestep/2.
-                    current_time=(
-                        ha == 1 ? current_time + 0.5timestep : current_time + timestep
-                    ),
+                    -0.5evol_dt; # forward by -im*dt/2, backwards by im*dt/2.
+                    current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
                     sweepdir=sweepdir,
                     which_decomp=decomp,
                     hermitian=hermitian,
@@ -157,7 +143,7 @@ function tdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kwargs...)
                 apply!(
                     cb,
                     state;
-                    t=current_time + timestep,
+                    t=current_time + dt,
                     site=site,
                     sweepend=(ha == 2),
                     sweepdir=sweepdir,
@@ -169,7 +155,7 @@ function tdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kwargs...)
         !isnothing(pbar) &&
             ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
 
-        current_time += timestep
+        current_time += dt
 
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0
@@ -192,48 +178,33 @@ function tdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kwargs...)
 end
 
 """
-    adaptivetdvp1!(solver, state::MPS, H::Vector{MPO}, Δt::Number, tf::Number; kwargs...)
+    adaptivetdvp1!([solver,] state::MPS, H::MPO, dt, tmax; kwargs...)
+    adaptivetdvp1!([solver,] state::MPS, H::Vector{MPO}, dt, tmax; kwargs...)
 
 Like `tdvp1!`, but grows the bond dimensions of the MPS along the time evolution until
 a certain convergence criterium is met.
+The keyword argument `convergence_factor_bonddims`, which defaults to `1e-4`, controls the
+convergence of the adaptation algorithm.
 
-See [`tdvp1!`](@ref).
+For an explanation of the other arguments, see [`tdvp1!`](@ref).
 """
-function adaptivetdvp1!(
-    solver, psi0::MPS, Hs::Vector{MPO}, time_step::Number, tf::Number; kwargs...
-)
+function adaptivetdvp1!(solver, state::MPS, Hs::Vector{MPO}, dt, tmax; kwargs...)
     # (Copied from ITensorsTDVP)
     for H in Hs
-        check_hascommoninds(siteinds, H, psi0)
-        check_hascommoninds(siteinds, H, psi0')
+        check_hascommoninds(siteinds, H, state)
+        check_hascommoninds(siteinds, H, state')
     end
     Hs .= permute.(Hs, Ref((linkind, siteinds, linkind)))
     PHs = ProjMPOSum(Hs)
-    return adaptivetdvp1!(solver, psi0, PHs, time_step, tf; kwargs...)
+    return adaptivetdvp1!(solver, state, PHs, dt, tmax; kwargs...)
 end
 
-"""
-    adaptivetdvp1!(solver, state::MPS, H::MPO, Δt::Number, tf::Number; kwargs...)
-
-Like `tdvp1!`, but grows the bond dimensions of the MPS along the time evolution until
-a certain convergence criterium is met.
-
-See [`tdvp1!`](@ref).
-"""
-function adaptivetdvp1!(solver, state::MPS, H::MPO, timestep::Number, tf::Number; kwargs...)
-    return adaptivetdvp1!(solver, state::MPS, ProjMPO(H), timestep, tf; kwargs...)
+function adaptivetdvp1!(solver, state::MPS, H::MPO, dt, tmax; kwargs...)
+    return adaptivetdvp1!(solver, state::MPS, ProjMPO(H), dt, tmax; kwargs...)
 end
 
-"""
-    adaptivetdvp1!(solver, state::MPS, PH, Δt::Number, tf::Number; kwargs...)
-
-Like `tdvp1!`, but grows the bond dimensions of the MPS along the time evolution until
-a certain convergence criterium is met.
-
-See [`tdvp1!`](@ref).
-"""
-function adaptivetdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kwargs...)
-    nsteps = Int(tf / timestep)
+function adaptivetdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
+    nsteps = Int(tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, true)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
@@ -254,8 +225,8 @@ function adaptivetdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kw
         pbar = nothing
     end
 
-    Δt = im * timestep
-    imag(Δt) == 0 && (Δt = real(Δt))
+    evol_dt = im * dt
+    imag(evol_dt) == 0 && (evol_dt = real(evol_dt))
 
     store_state0 && (state0 = copy(state))
 
@@ -308,10 +279,8 @@ function adaptivetdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kw
                     PH,
                     state,
                     site,
-                    -0.5Δt;
-                    current_time=(
-                        ha == 1 ? current_time + 0.5timestep : current_time + timestep
-                    ),
+                    -0.5evol_dt;
+                    current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
                     sweepdir=sweepdir,
                     which_decomp=decomp,
                     hermitian=hermitian,
@@ -334,7 +303,7 @@ function adaptivetdvp1!(solver, state::MPS, PH, timestep::Number, tf::Number; kw
         !isnothing(pbar) &&
             ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
 
-        current_time += timestep
+        current_time += dt
 
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0

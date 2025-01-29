@@ -53,13 +53,13 @@ function tdvp2!(ψ, H::MPO, timestep, endtime; kwargs...)
         pbar = nothing
     end
 
-    Δt = im * timestep
+    dt = im * timestep
     # If `timestep` is imaginary and imag(timestep) > 0, this gives us an evolution operator
-    # of the form U(Δt) = exp(-Δt H) which denotes an "imaginary-time" evolution.
-    imag(Δt) == 0 && (Δt = real(Δt))
-    # A unitary evolution is associated to a real `timestep`. In this case, Δt is purely
+    # of the form U(dt) = exp(-dt H) which denotes an "imaginary-time" evolution.
+    imag(dt) == 0 && (dt = real(dt))
+    # A unitary evolution is associated to a real `timestep`. In this case, dt is purely
     # imaginary, as it should.
-    # Otherwise, with an imaginary-time evolution, Δt is real, but the Type of the variable
+    # Otherwise, with an imaginary-time evolution, dt is real, but the Type of the variable
     # is Complex, so we truncate any imaginary part away.
     # (`real` doesn't just chop off the imaginary part, it also converts the type from
     # Complex{T} to T.)
@@ -92,7 +92,7 @@ function tdvp2!(ψ, H::MPO, timestep, endtime; kwargs...)
                 position!(PH, ψ, b)
                 wf = ψ[b] * ψ[b + 1]
                 wf, info = exponentiate(
-                    PH, -0.5Δt, wf; ishermitian=hermitian, tol=exp_tol, krylovdim=krylovdim
+                    PH, -0.5dt, wf; ishermitian=hermitian, tol=exp_tol, krylovdim=krylovdim
                 )
 
                 info.converged == 0 && throw("exponentiate did not converge")
@@ -154,7 +154,7 @@ function tdvp2!(ψ, H::MPO, timestep, endtime; kwargs...)
                     position!(PH, ψ, i)
                     ψ[i], info = exponentiate(
                         PH,
-                        0.5Δt,
+                        0.5dt,
                         ψ[i];
                         ishermitian=hermitian,
                         tol=exp_tol,
@@ -194,12 +194,12 @@ function tdvp2!(ψ, H::MPO, timestep, endtime; kwargs...)
 end
 
 """
-    tdvpMC!(state, H::MPO, dt, tf; kwargs...)
+    tdvpMC!(state, H::MPO, dt, tmax; kwargs...)
 
-Evolve the MPS `state` using the MPO `H` from 0 to `tf` using an integration step `dt`.
+Evolve the MPS `state` using the MPO `H` from 0 to `tmax` using an integration step `dt`.
 """
-function tdvpMC!(state, H::MPO, dt, tf; kwargs...)
-    nsteps = Int(tf / dt)
+function tdvpMC!(state, H::MPO, dt, tmax; kwargs...)
+    nsteps = Int(tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, false) # Lindblad superoperator is not Hermitian
     exp_tol = get(kwargs, :exp_tol, 1e-14)
