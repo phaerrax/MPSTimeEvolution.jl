@@ -86,7 +86,7 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
     # U(-itH).
     # Passing an imaginary time step iτ (and `tmax`) as an argument results in an evolution
     # according to the operator U(-τH), useful for thermalization processes.
-    evol_dt = im * evol_dt
+    evol_dt = im * dt
     # Discard imaginary part if time step is real.
     imag(evol_dt) == 0 && (evol_dt = real(evol_dt))
 
@@ -102,6 +102,23 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
         N = length(states[1])
     end
 
+    # Measure everything once in the initial state.
+    current_time = 0.0
+    for j in reverse(eachindex(first(states)))
+        apply!(
+            cb,
+            states...;
+            t=current_time,
+            site=j,
+            sweepend=true,
+            sweepdir="left",
+            alg=TDVP1(),
+        )
+    end
+
+    printoutput_data(io_handle, cb, states...; kwargs...)
+    printoutput_ranks(ranks_handle, cb, states...)
+
     states = [states...]  # Convert tuple into vector so that we can mutate its elements
     projections = [PH, deepcopy(PH)]  # The projection on different states will be different
 
@@ -112,7 +129,6 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
         position!(PH, state, 1)
     end
 
-    current_time = 0.0
     for s in 1:nsteps
         stime = @elapsed begin
             # In TDVP1 only one site at a time is modified, so we iterate on the sites
@@ -148,7 +164,7 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
                 apply!(
                     cb,
                     states...;
-                    t=current_time,
+                    t=current_time + dt,
                     site=site,
                     sweepend=(ha == 2),
                     sweepdir=sweepdir,
@@ -156,6 +172,8 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
                 )
             end
         end
+
+        current_time += dt
 
         !isnothing(pbar) && ProgressMeter.next!(
             pbar; showvalues=simulationinfo(states, current_time, stime)
@@ -166,8 +184,6 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
             printoutput_ranks(ranks_handle, cb, states...)
             printoutput_stime(times_handle, stime)
         end
-
-        current_time += dt
 
         checkdone!(cb) && break
     end

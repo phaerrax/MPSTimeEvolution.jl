@@ -152,10 +152,10 @@ function tdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
             end
         end
 
+        current_time += dt
+
         !isnothing(pbar) &&
             ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
-
-        current_time += dt
 
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0
