@@ -11,3 +11,8 @@ include("joint_tdvp.jl")
 @testset "Joint TDVP1 method" begin
     @test siam_check_jointtdvp1()
 end
+
+include("tdvp_sum_mpos.jl")
+@testset "Vectorised TDVP1 method with a sum of MPOs" begin
+    @test siam_compare_tdvp_with_sum()
+end
