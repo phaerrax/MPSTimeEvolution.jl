@@ -113,37 +113,35 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
     position!(PH, state, 1)
 
     for s in 1:nsteps
-        stime = @elapsed begin
-            # In TDVP1 only one site at a time is modified, so we iterate on the sites
-            # of the state's MPS, not the bonds.
-            for (site, ha) in sweepnext(N; ncenter=1)
-                # sweepnext(N) is an iterable object that evaluates to tuples of the form
-                # (bond, ha) where bond is the bond number and ha is the half-sweep number.
-                # The kwarg ncenter determines the end and turning points of the loop: if
-                # it equals 1, then we perform a sweep on each single site.
-                sweepdir = (ha == 1 ? "right" : "left")
-                tdvp_site_update!(
-                    solver,
-                    PH,
-                    state,
-                    site,
-                    0.5dt;
-                    current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
-                    sweepdir=sweepdir,
-                    which_decomp=decomp,
-                    hermitian=hermitian,
-                    exp_tol=exp_tol,
-                    krylovdim=krylovdim,
-                    maxiter=maxiter,
-                )
-            end
+        # In TDVP1 only one site at a time is modified, so we iterate on the sites
+        # of the state's MPS, not the bonds.
+        stime = @elapsed for (site, ha) in sweepnext(N; ncenter=1)
+            # sweepnext(N) is an iterable object that evaluates to tuples of the form
+            # (bond, ha) where bond is the bond number and ha is the half-sweep number.
+            # The kwarg ncenter determines the end and turning points of the loop: if
+            # it equals 1, then we perform a sweep on each single site.
+            sweepdir = (ha == 1 ? "right" : "left")
+            tdvp_site_update!(
+                solver,
+                PH,
+                state,
+                site,
+                0.5dt;
+                current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
+                sweepdir=sweepdir,
+                which_decomp=decomp,
+                hermitian=hermitian,
+                exp_tol=exp_tol,
+                krylovdim=krylovdim,
+                maxiter=maxiter,
+            )
         end
 
         current_time += dt
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
-        for site in eachindex(state)
+        mtime = @elapsed for site in eachindex(state)
             apply!(
                 cb,
                 state;
@@ -154,6 +152,9 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
                 alg=TDVP1vec(),
             )
         end
+
+        @debug "Time spent on time-evolution step: $stime s" *
+            "\nTime spent on computing expectation values: $mtime s"
 
         !isnothing(pbar) &&
             ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
@@ -272,35 +273,33 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwa
         @debug "[Step $s] Attempting to grow the bond dimensions."
         adaptbonddimensions!(state, PH, max_bond, convergence_factor_bonddims)
 
-        stime = @elapsed begin
-            for (site, ha) in sweepnext(N; ncenter=1)
-                # sweepnext(N) is an iterable object that evaluates to tuples of the form
-                # (bond, ha) where bond is the bond number and ha is the half-sweep number.
-                # The kwarg ncenter determines the end and turning points of the loop: if
-                # it equals 1, then we perform a sweep on each single site.
-                sweepdir = (ha == 1 ? "right" : "left")
-                tdvp_site_update!(
-                    solver,
-                    PH,
-                    state,
-                    site,
-                    0.5dt;
-                    current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
-                    sweepdir=sweepdir,
-                    which_decomp=decomp,
-                    hermitian=hermitian,
-                    exp_tol=exp_tol,
-                    krylovdim=krylovdim,
-                    maxiter=maxiter,
-                )
-            end
+        stime = @elapsed for (site, ha) in sweepnext(N; ncenter=1)
+            # sweepnext(N) is an iterable object that evaluates to tuples of the form
+            # (bond, ha) where bond is the bond number and ha is the half-sweep number.
+            # The kwarg ncenter determines the end and turning points of the loop: if
+            # it equals 1, then we perform a sweep on each single site.
+            sweepdir = (ha == 1 ? "right" : "left")
+            tdvp_site_update!(
+                solver,
+                PH,
+                state,
+                site,
+                0.5dt;
+                current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
+                sweepdir=sweepdir,
+                which_decomp=decomp,
+                hermitian=hermitian,
+                exp_tol=exp_tol,
+                krylovdim=krylovdim,
+                maxiter=maxiter,
+            )
         end
 
         current_time += dt
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
-        for site in eachindex(state)
+        mtime = @elapsed for site in eachindex(state)
             apply!(
                 cb,
                 state;
@@ -312,14 +311,11 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwa
             )
         end
 
-        !isnothing(pbar) && ProgressMeter.next!(
-            pbar;
-            showvalues=[
-                ("t", current_time),
-                ("dt step time", round(stime; digits=3)),
-                ("Max bond-dim", maxlinkdim(state)),
-            ],
-        )
+        @debug "Time spent on time-evolution step: $stime s" *
+            "\nTime spent on computing expectation values: $mtime s"
+
+        !isnothing(pbar) &&
+            ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
 
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0
