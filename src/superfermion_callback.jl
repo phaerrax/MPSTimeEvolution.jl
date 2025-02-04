@@ -1,25 +1,27 @@
 export SuperfermionCallback
 
-const SuperfermionSeries = Vector{ComplexF64}
-
 struct SuperfermionCallback <: TEvoCallback
     operators::Vector{LocalOperator}
     sites::Vector{<:Index}
-    measurements::Dict{LocalOperator,SuperfermionSeries}
+    measurements::Dict{LocalOperator,ExpValueSeries}
     times::Vector{Float64}
     measure_timestep::Float64
 end
 
 """
-    SuperfermionCallback(ops::Vector{LocalOperator},
-                          sites::Vector{<:Index},
-                          measure_timestep::Float64)
+    SuperfermionCallback(
+        operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
+    )
 
-Construct a SuperfermionCallback, providing an array `ops` of `LocalOperator` objects which
-represent operators associated to specific sites. Each of these operators will be measured
+Construct a `SuperfermionCallback` providing an array `operators` of `LocalOperator` objects
+representing operators associated to specific sites. Each of them will be measured
 on the given site during every step of the time evolution, and the results recorded inside
-the SuperfermionCallback object as a SuperfermionSeries for later analysis. The array
-`sites` is the basis of sites used to define the MPS and MPO for the calculations.
+the `SuperfermionCallback` object as an `ExpValueSeries` for later analysis. The array
+`sites` is the same basis of sites used to define the MPS and MPO for the calculations.
+
+This struct is actually defined the same say as [`ExpValueCallback`](@ref), but it allows
+using Julia's multiple dispatch features to choose the correct method to measure expectation
+values.
 """
 function SuperfermionCallback(
     operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
@@ -27,8 +29,8 @@ function SuperfermionCallback(
     return SuperfermionCallback(
         operators,
         sites,
-        Dict(op => SuperfermionSeries() for op in operators),
-        # A single SuperfermionSeries for each operator in the list.
+        Dict(op => ExpValueSeries() for op in operators),
+        # A single ExpValueSeries for each operator in the list.
         Vector{Float64}(),
         measure_timestep,
     )
@@ -55,39 +57,7 @@ end
 
 checkdone!(cb::SuperfermionCallback, args...) = false
 
-"""
-    measure_localops!(cb::SuperfermionCallback, state::MPS, site::Int, alg::TDVP1)
-
-Measure each operator defined inside the callback object `cb` on the state `state`
-"""
-function measure_localops!(cb::SuperfermionCallback, state::MPS, site::Int, alg::TDVP1)
-    # Since the operators may be defined on more than one site, we need to check that
-    # all the sites in their domain have been completely updated: this means that we must
-    # wait until the final sweep of the evolution step has passed each site in the domain.
-    # Note that this function gets called (or should be called) only if the current sweep
-    # is the final sweep in the step.
-
-    # When `ψ[site]` has been updated during the leftwards sweep, the orthocentre lies on
-    # site `max(1, site-1)`, and all `ψ[n]` with `n >= site` are correctly updated.
-    measurable_operators = filter(op -> site <= first(domain(op)), ops(cb))
-    s = siteinds(ψ)
-    for localop in measurable_operators
-        # This works, but calculating the MPO from scratch every time might take too much
-        # time, especially when it has to be repeated thousands of times. For example,
-        # executing TimeEvoVecMPS.mpo(s, o) with
-        #   s = siteinds("Osc", 400; dim=16)
-        #   o = LocalOperator(Dict(20 => "A", 19 => "Adag"))
-        # takes 177.951 ms (2313338 allocations: 329.80 MiB).
-        # Memoizing this function allows us to cut the time (after the first call, which is
-        # expensive anyway since Julia needs to compile the function) to 45.368 ns
-        # (1 allocation: 32 bytes) for each call.
-        measurements(cb)[localop][end] = dot(ψ', mpo(s, localop), ψ)
-        # measurements(cb)[localop][end] is the last line in the measurements of localop,
-        # which we (must) have created in apply! before calling this function.
-    end
-end
-
-@memoize function identity_sf(::SiteType"Fermion", sites)
+@memoize function identity_sf(sites)
     N = length(sites)
     @assert iseven(N)
     pairs = [
@@ -123,7 +93,7 @@ Note that it is not the same as ITensors.adjoint.
 adj(x) = swapprime(dag(x), 0 => 1)
 
 @memoize function _sf_observable_mps(op, sites)
-    id = identity_sf(SiteType("Fermion"), sites)
+    id = identity_sf(sites)
     x = mpo(sites, op)
     return apply(adj(x), id)
 end

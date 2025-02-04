@@ -141,7 +141,7 @@ function printoutput_data(io_handle, cb, psi::MPS; kwargs...)
         # a pure state or a vectorized density matrix.
         if get(kwargs, :vectorized, false)
             if get(kwargs, :superfermions, false)
-                push!(data, real(dot(identity_sf(SiteType("Fermion"), siteinds(psi)), psi)))
+                push!(data, real(dot(identity_sf(siteinds(psi)), psi)))
             else
                 # TODO Use built-in trace function, do not create an MPS from scratch each time!
                 push!(data, real(inner(MPS(siteinds(psi), "vId"), psi)))

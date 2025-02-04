@@ -11,15 +11,15 @@ struct ExpValueCallback <: TEvoCallback
 end
 
 """
-    ExpValueCallback(ops::Vector{LocalOperator},
-                          sites::Vector{<:Index},
-                          measure_timestep::Float64)
+    ExpValueCallback(
+        operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
+    )
 
-Construct a ExpValueCallback, providing an array `ops` of LocalOperator objects which
-represent operators associated to specific sites. Each of these operators will be measured
+Construct an `ExpValueCallback`, providing an array `operators` of `LocalOperator` objects
+representing operators associated to specific sites. Each of them will be measured
 on the given site during every step of the time evolution, and the results recorded inside
-the ExpValueCallback object as a ExpValueSeries for later analysis. The array
-`sites` is the basis of sites used to define the MPS and MPO for the calculations.
+the `ExpValueCallback` object as an `ExpValueSeries` for later analysis. The array
+`sites` is the same basis of sites used to define the MPS and MPO for the calculations.
 """
 function ExpValueCallback(
     operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
