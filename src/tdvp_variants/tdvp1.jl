@@ -93,9 +93,7 @@ function tdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
     # Measure everything once in the initial state.
     current_time = 0.0
     for j in reverse(eachindex(state))
-        apply!(
-            cb, state; t=current_time, site=j, sweepend=true, sweepdir="left", alg=TDVP1()
-        )
+        apply!(cb, state, TDVP1(); t=current_time, site=j, sweepend=true, sweepdir="left")
     end
 
     if store_state0
@@ -142,12 +140,12 @@ function tdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
                 # rightwards
                 apply!(
                     cb,
-                    state;
+                    state,
+                    TDVP1();
                     t=current_time + dt,
                     site=site,
                     sweepend=(ha == 2),
                     sweepdir=sweepdir,
-                    alg=TDVP1(),
                 )
             end
         end
@@ -239,9 +237,7 @@ function adaptivetdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
     # Measure everything once in the initial state.
     current_time = 0.0
     for j in reverse(eachindex(state))
-        apply!(
-            cb, state; t=current_time, site=j, sweepend=true, sweepdir="left", alg=TDVP1()
-        )
+        apply!(cb, state, TDVP1(); t=current_time, site=j, sweepend=true, sweepdir="left")
     end
 
     if store_state0
@@ -290,12 +286,12 @@ function adaptivetdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
                 )
                 apply!(
                     cb,
-                    state;
+                    state,
+                    TDVP1();
                     t=current_time,
                     bond=site,
                     sweepend=(ha == 2),
                     sweepdir=sweepdir,
-                    alg=TDVP1(),
                 )
             end
         end

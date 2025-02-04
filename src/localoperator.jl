@@ -149,7 +149,7 @@ end
 end
 
 """
-    measure_localops!(cb::LocalOperatorCallback, ψ::MPS, site::Int, alg::TDVP1)
+    measure_localops!(cb::LocalOperatorCallback, ψ::MPS, i::Int, alg::TDVP1)
 
 Measure each operator defined inside the callback object `cb` on the state `ψ` at site `i`.
 """
@@ -205,11 +205,11 @@ Return an MPS with the factors in `lop` or `vId` if the site is not in the domai
 end
 
 """
-    measure_localops!(cb::LocalOperatorCallback, ψ::MPS, site::Int, alg::TDVP1vec)
+    measure_localops!(cb::LocalOperatorCallback, ψ::MPS, alg::TDVP1vec)
 
-Measure each operator defined inside the callback object `cb` on the state `ψ` at site `i`.
+Measure each operator defined inside the callback object `cb` on the state `ψ`.
 """
-function measure_localops!(cb::LocalOperatorCallback, ψ::MPS, site::Int, alg::TDVP1vec)
+function measure_localops!(cb::LocalOperatorCallback, ψ::MPS, alg::TDVP1vec)
     # With TDVP1vec algorithms the situation is much simpler than with simple TDVP1: since
     # we need to contract any site which is not "occupied" (by the operator which is to be
     # measured) anyway with vec(I), we don't need to care about the orthocenter, we just
@@ -227,7 +227,7 @@ function measure_localops!(cb::LocalOperatorCallback, ψ::MPS, site::Int, alg::T
 end
 
 function apply!(
-    cb::LocalOperatorCallback, state; t, sweepend, sweepdir, site, alg, kwargs...
+    cb::LocalOperatorCallback, state, alg::TDVP1; t, sweepend, sweepdir, site, kwargs...
 )
     if isempty(measurement_ts(cb))
         prev_t = 0
@@ -237,11 +237,7 @@ function apply!(
 
     # We perform measurements only at the end of a sweep and at measurement steps.
     # For TDVP we can perform measurements to the right of each site when sweeping back left.
-    if !(alg isa TDVP1 || alg isa TDVP1vec)
-        error("apply! function only implemented for TDVP1 algorithms.")
-    end
-
-    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend
+    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend && sweepdir == "left"
         if (t != prev_t || t == 0)
             # Add the current time to the list of time instants at which we measured
             # something.
@@ -250,6 +246,28 @@ function apply!(
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
         end
         measure_localops!(cb, state, site, alg)
+    end
+
+    return nothing
+end
+
+function apply!(cb::LocalOperatorCallback, state, alg::TDVP1vec; t, sweepend, kwargs...)
+    if isempty(measurement_ts(cb))
+        prev_t = 0
+    else
+        prev_t = measurement_ts(cb)[end]
+    end
+
+    # We perform measurements only at the end of a sweep and at measurement steps.
+    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend
+        if (t != prev_t || t == 0)
+            # Add the current time to the list of time instants at which we measured
+            # something.
+            push!(measurement_ts(cb), t)
+            # Create a new slot in which we will put the measurement result.
+            foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
+        end
+        measure_localops!(cb, state, alg)
     end
 
     return nothing

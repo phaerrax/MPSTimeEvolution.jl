@@ -89,17 +89,8 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
 
     # Measure everthing once in the initial state.
     current_time = 0.0
-    for j in eachindex(state)
-        apply!(
-            cb,
-            state;
-            t=current_time,
-            site=j,
-            sweepend=true,
-            sweepdir="left", # (this value doesn't matter)
-            alg=TDVP1vec(),
-        )
-    end
+    apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+
     if store_state0
         printoutput_data(io_handle, cb, state; psi0=state0, vectorized=true, kwargs...)
     else
@@ -141,17 +132,7 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
-        mtime = @elapsed for site in eachindex(state)
-            apply!(
-                cb,
-                state;
-                t=current_time,
-                site=site,
-                sweepend=true,
-                sweepdir="right", # This value doesn't matter.
-                alg=TDVP1vec(),
-            )
-        end
+        mtime = @elapsed apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
 
         @debug "Time spent on time-evolution step: $stime s" *
             "\nTime spent on computing expectation values: $mtime s"
@@ -245,17 +226,8 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwa
 
     # Measure everthing once in the initial state.
     current_time = 0.0
-    for site in eachindex(state)
-        apply!(
-            cb,
-            state;
-            t=current_time,
-            site=site,
-            sweepend=true,
-            sweepdir="left", # (this value doesn't matter)
-            alg=TDVP1vec(),
-        )
-    end
+    apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+
     if store_state0
         printoutput_data(io_handle, cb, state; psi0=state0, vectorized=true, kwargs...)
     else
@@ -299,17 +271,7 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwa
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
-        mtime = @elapsed for site in eachindex(state)
-            apply!(
-                cb,
-                state;
-                t=current_time,
-                site=site,
-                sweepend=true,
-                sweepdir="right", # This value doesn't matter.
-                alg=TDVP1vec(),
-            )
-        end
+        mtime = @elapsed apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
 
         @debug "Time spent on time-evolution step: $stime s" *
             "\nTime spent on computing expectation values: $mtime s"

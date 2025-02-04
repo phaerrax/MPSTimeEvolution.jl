@@ -87,7 +87,7 @@ function measure_localops!(cb::SuperfermionCallback, state::MPS, site::Int, alg:
     end
 end
 
-function identity_sf(::SiteType"Fermion", sites)
+@memoize function identity_sf(::SiteType"Fermion", sites)
     N = length(sites)
     @assert iseven(N)
     pairs = [
@@ -122,19 +122,18 @@ Note that it is not the same as ITensors.adjoint.
 """
 adj(x) = swapprime(dag(x), 0 => 1)
 
-function _sf_observable_mps(op, sites)
+@memoize function _sf_observable_mps(op, sites)
     id = identity_sf(SiteType("Fermion"), sites)
     x = mpo(sites, op)
     return apply(adj(x), id)
 end
 
 """
-    measure_localops!(cb::SuperfermionCallback, state::MPS, site::Int, alg::TDVP1vec)
+    measure_localops!(cb::SuperfermionCallback, state::MPS, alg::TDVP1vec)
 
-Measure each operator defined inside the callback object `cb` on the state `state` at site
-`site`.
+Measure each operator defined inside the callback object `cb` on the state `state`.
 """
-function measure_localops!(cb::SuperfermionCallback, state::MPS, site::Int, alg::TDVP1vec)
+function measure_localops!(cb::SuperfermionCallback, state::MPS, alg::TDVP1vec)
     # With TDVP1vec algorithms the situation is much simpler than with simple TDVP1: since
     # we need to contract any site which is not "occupied" (by the operator which is to be
     # measured) anyway with vec(I), we don't need to care about the orthocenter, we just
@@ -151,19 +150,11 @@ function measure_localops!(cb::SuperfermionCallback, state::MPS, site::Int, alg:
     end
 end
 
-function apply!(
-    cb::SuperfermionCallback, state::MPS; t, sweepend, sweepdir, site, alg, kwargs...
-)
+function apply!(cb::SuperfermionCallback, state::MPS, alg::TDVP1vec; t, sweepend, kwargs...)
     if isempty(measurement_ts(cb))
         prev_t = 0
     else
         prev_t = measurement_ts(cb)[end]
-    end
-
-    # We perform measurements only at the end of a sweep and at measurement steps.
-    # For TDVP we can perform measurements to the right of each site when sweeping back left.
-    if !(alg isa TDVP1 || alg isa TDVP1vec)
-        error("apply! function only implemented for TDVP1 algorithms.")
     end
 
     if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend
@@ -174,7 +165,7 @@ function apply!(
             # Create a new slot in which we will put the measurement result.
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
         end
-        measure_localops!(cb, state, site, alg)
+        measure_localops!(cb, state, alg)
     end
 
     return nothing

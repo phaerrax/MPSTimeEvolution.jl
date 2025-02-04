@@ -125,11 +125,11 @@ function measure_localops!(
 end
 
 """
-    measure_localops!(cb::ExpValueCallback, ψ::MPS, site::Int, alg::TDVP1vec)
+    measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)
 
-Measure each operator defined inside the callback object `cb` on the state `ψ` at site `i`.
+Measure each operator defined inside the callback object `cb` on the state `ψ`.
 """
-function measure_localops!(cb::ExpValueCallback, ψ::MPS, site::Int, alg::TDVP1vec)
+function measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)
     # With TDVP1vec algorithms the situation is much simpler than with simple TDVP1: since
     # we need to contract any site which is not "occupied" (by the operator which is to be
     # measured) anyway with vec(I), we don't need to care about the orthocenter, we just
@@ -144,7 +144,7 @@ function measure_localops!(cb::ExpValueCallback, ψ::MPS, site::Int, alg::TDVP1v
 end
 
 function apply!(
-    cb::ExpValueCallback, state::MPS; t, sweepend, sweepdir, site, alg, kwargs...
+    cb::ExpValueCallback, state::MPS, alg::TDVP1; t, sweepend, sweepdir, site, kwargs...
 )
     if isempty(measurement_ts(cb))
         prev_t = 0
@@ -154,11 +154,7 @@ function apply!(
 
     # We perform measurements only at the end of a sweep and at measurement steps.
     # For TDVP we can perform measurements to the right of each site when sweeping back left.
-    if !(alg isa TDVP1 || alg isa TDVP1vec)
-        error("apply! function only implemented for TDVP1 algorithms.")
-    end
-
-    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend
+    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend && sweepdir == "left"
         @debug "Computing expectation values on site $site at t = $t (prev_t = $prev_t)"
         if (t != prev_t || t == 0)
             # Add the current time to the list of time instants at which we measured
@@ -176,12 +172,12 @@ end
 function apply!(
     cb::ExpValueCallback,
     state1::MPS,
-    state2::MPS;
+    state2::MPS,
+    alg::TDVP1;
     t,
     sweepend,
     sweepdir,
     site,
-    alg,
     kwargs...,
 )
     if isempty(measurement_ts(cb))
@@ -192,11 +188,8 @@ function apply!(
 
     # We perform measurements only at the end of a sweep and at measurement steps.
     # For TDVP we can perform measurements to the right of each site when sweeping back left.
-    if !(alg isa TDVP1)
-        error("apply! function with two states only implemented for the TDVP1 algorithm.")
-    end
-
-    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend
+    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend && sweepdir == "left"
+        @debug "Computing expectation values on site $site at t = $t (prev_t = $prev_t)"
         if (t != prev_t || t == 0)
             # Add the current time to the list of time instants at which we measured
             # something.
@@ -205,6 +198,29 @@ function apply!(
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
         end
         measure_localops!(cb, state1, state2, site, alg)
+    end
+
+    return nothing
+end
+
+function apply!(cb::ExpValueCallback, state::MPS, alg::TDVP1vec; t, sweepend, kwargs...)
+    if isempty(measurement_ts(cb))
+        prev_t = 0
+    else
+        prev_t = measurement_ts(cb)[end]
+    end
+
+    # We perform measurements only at the end of a sweep and at measurement steps.
+    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend
+        @debug "Computing expectation values at t = $t (prev_t = $prev_t)"
+        if (t != prev_t || t == 0)
+            # Add the current time to the list of time instants at which we measured
+            # something.
+            push!(measurement_ts(cb), t)
+            # Create a new slot in which we will put the measurement result.
+            foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
+        end
+        measure_localops!(cb, state, alg)
     end
 
     return nothing

@@ -106,13 +106,7 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
     current_time = 0.0
     for j in reverse(eachindex(first(states)))
         apply!(
-            cb,
-            states...;
-            t=current_time,
-            site=j,
-            sweepend=true,
-            sweepdir="left",
-            alg=TDVP1(),
+            cb, states..., TDVP1(); t=current_time, site=j, sweepend=true, sweepdir="left"
         )
     end
 
@@ -163,12 +157,12 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
                 # rightwards
                 apply!(
                     cb,
-                    states...;
+                    states...,
+                    TDVP1();
                     t=current_time + dt,
                     site=site,
                     sweepend=(ha == 2),
                     sweepdir=sweepdir,
-                    alg=TDVP1(),
                 )
             end
         end
