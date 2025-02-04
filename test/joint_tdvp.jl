@@ -23,11 +23,8 @@ function siam_tdvp1_with_phase(; phase, dt, tmax, N)
         H,
         dt,
         tmax;
-        hermitian=true,
-        normalize=false,
         callback=cb,
-        progress=true,
-        store_psi0=false,
+        progress=false,
         io_file=tmpfile,
         io_ranks="/dev/null",
         io_times="/dev/null",
@@ -65,6 +62,7 @@ function siam_jointtdvp1_with_phase(; phase, dt, tmax, N)
         dt,
         tmax;
         callback=cb,
+        progress=false,
         io_file=tmpfile,
         io_ranks="/dev/null",
         io_times="/dev/null",
