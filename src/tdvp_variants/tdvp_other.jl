@@ -35,7 +35,7 @@ Physical Review B, 94(16).
 https://doi.org/10.1103/PhysRevB.94.165116
 """
 function tdvp2!(ψ, H::MPO, timestep, endtime; kwargs...)
-    nsteps = Int(endtime / timestep)
+    nsteps = floor(Int, endtime / timestep)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, true)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
@@ -199,7 +199,7 @@ end
 Evolve the MPS `state` using the MPO `H` from 0 to `tmax` using an integration step `dt`.
 """
 function tdvpMC!(state, H::MPO, dt, tmax; kwargs...)
-    nsteps = Int(tmax / dt)
+    nsteps = floor(Int, tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, false) # Lindblad superoperator is not Hermitian
     exp_tol = get(kwargs, :exp_tol, 1e-14)

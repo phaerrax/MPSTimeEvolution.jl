@@ -54,7 +54,7 @@ function tdvp1!(solver, state::MPS, H::MPO, dt, tmax; kwargs...)
 end
 
 function tdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
-    nsteps = Int(tmax / dt)
+    nsteps = floor(Int, tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, true)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
@@ -202,7 +202,7 @@ function adaptivetdvp1!(solver, state::MPS, H::MPO, dt, tmax; kwargs...)
 end
 
 function adaptivetdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
-    nsteps = Int(tmax / dt)
+    nsteps = floor(Int, tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, true)
     exp_tol = get(kwargs, :exp_tol, 1e-14)

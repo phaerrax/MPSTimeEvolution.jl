@@ -64,7 +64,7 @@ end
 function adjtdvp1vec!(
     solver, operator::MPS, initialstates::Vector{MPS}, PH, dt, tmax, meas_stride; kwargs...
 )
-    nsteps = Int(tmax / dt)
+    nsteps = floor(Int, tmax / dt)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
     krylovdim = get(kwargs, :krylovdim, 30)
     maxiter = get(kwargs, :maxiter, 100)
@@ -238,7 +238,7 @@ end
 function adaptiveadjtdvp1vec!(
     solver, operator::MPS, initialstates::Vector{MPS}, PL, dt, tmax, meas_stride; kwargs...
 )
-    nsteps = Int(tmax / dt)
+    nsteps = floor(Int, tmax / dt)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
     krylovdim = get(kwargs, :krylovdim, 30)
     maxiter = get(kwargs, :maxiter, 100)

@@ -62,7 +62,7 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, H::MPO, dt, tmax; kwargs...
 end
 
 function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
-    nsteps = Int(tmax / dt)
+    nsteps = floor(Int, tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, true)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
