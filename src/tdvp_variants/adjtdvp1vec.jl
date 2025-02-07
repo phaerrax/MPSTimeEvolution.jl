@@ -101,6 +101,11 @@ function adjtdvp1vec!(
 
     N = length(operator)
 
+    # Prepare for first iteration.
+    orthogonalize!(operator, 1)
+    set_nsite!(PH, 1)
+    position!(PH, operator, 1)
+
     # Measure everthing once in the initial state.
     current_time = zero(dt)
     prev_t = zero(dt)
@@ -115,11 +120,6 @@ function adjtdvp1vec!(
 
     println(ranks_handle, join([current_time; linkdims(operator)], ","))
     flush(ranks_handle)
-
-    # Prepare for first iteration.
-    orthogonalize!(operator, 1)
-    set_nsite!(PH, 1)
-    position!(PH, operator, 1)
 
     for s in 1:nsteps
         stime = @elapsed begin

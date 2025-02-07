@@ -1,4 +1,3 @@
-using IterTools: partition
 using CSV
 
 function siam_tdvp1_with_phase(; phase, dt, tmax, N)
@@ -77,7 +76,7 @@ end
 # This tests pushes the bond dimension to the maximum admitted by the sizes of the system,
 # so it's best to keep N relatively low so that the computation doesn't get too heavy.
 function siam_check_jointtdvp1(; phase=pi / 6, dt=0.01, tmax=0.5, N=6)
-    _, res_tdvp1_n1, res_tdvp1_n5 = siam_tdvp1_with_phase(;
+    t, res_tdvp1_n1, res_tdvp1_n5 = siam_tdvp1_with_phase(;
         phase=phase, dt=dt, tmax=tmax, N=N
     )
     _, res_joint_tdvp1_n1, res_joint_tdvp1_n5 = siam_jointtdvp1_with_phase(;

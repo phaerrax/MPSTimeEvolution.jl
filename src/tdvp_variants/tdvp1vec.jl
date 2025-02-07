@@ -87,6 +87,11 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
 
     N = length(state)
 
+    # Prepare for first iteration.
+    orthogonalize!(state, 1)
+    set_nsite!(PH, 1)
+    position!(PH, state, 1)
+
     # Measure everthing once in the initial state.
     current_time = 0.0
     apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
@@ -97,11 +102,6 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
         printoutput_data(io_handle, cb, state; vectorized=true, kwargs...)
     end
     printoutput_ranks(ranks_handle, cb, state)
-
-    # Prepare for first iteration.
-    orthogonalize!(state, 1)
-    set_nsite!(PH, 1)
-    position!(PH, state, 1)
 
     for s in 1:nsteps
         # In TDVP1 only one site at a time is modified, so we iterate on the sites

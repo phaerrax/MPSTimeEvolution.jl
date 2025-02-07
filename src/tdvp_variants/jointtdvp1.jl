@@ -102,17 +102,6 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
         N = length(states[1])
     end
 
-    # Measure everything once in the initial state.
-    current_time = 0.0
-    for j in reverse(eachindex(first(states)))
-        apply!(
-            cb, states..., TDVP1(); t=current_time, site=j, sweepend=true, sweepdir="left"
-        )
-    end
-
-    printoutput_data(io_handle, cb, states...; kwargs...)
-    printoutput_ranks(ranks_handle, cb, states...)
-
     states = [states...]  # Convert tuple into vector so that we can mutate its elements
     projections = [PH, deepcopy(PH)]  # The projection on different states will be different
 
@@ -123,51 +112,49 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
         position!(PH, state, 1)
     end
 
-    for s in 1:nsteps
-        stime = @elapsed begin
-            # In TDVP1 only one site at a time is modified, so we iterate on the sites
-            # of the state's MPS, not the bonds.
-            for (site, ha) in sweepnext(N; ncenter=1)
-                # sweepnext(N) is an iterable object that evaluates to tuples of the form
-                # (bond, ha) where bond is the bond number and ha is the half-sweep number.
-                # The kwarg ncenter determines the end and turning points of the loop: if
-                # it equals 1, then we perform a sweep on each single site.
+    # Measure everything once in the initial state.
+    current_time = 0.0
+    apply!(cb, states..., TDVP1(); t=current_time, sweepend=true, sweepdir="left")
 
-                # ha == 1  =>  left-to-right sweep
-                # ha == 2  =>  right-to-left sweep
-                sweepdir = (ha == 1 ? "right" : "left")
-                for (state, PH) in zip(states, projections)
-                    tdvp_site_update!(
-                        solver,
-                        PH,
-                        state,
-                        site,
-                        -0.5evol_dt; # forward by -im*dt/2, backwards by im*dt/2.
-                        current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
-                        sweepdir=sweepdir,
-                        which_decomp=decomp,
-                        hermitian=hermitian,
-                        exp_tol=exp_tol,
-                        krylovdim=krylovdim,
-                        maxiter=maxiter,
-                    )
-                end
-                # At least with TDVP1, `tdvp_site_update!` updates the site at `site`, and
-                # leaves the MPS with orthocenter at `site+1` or `site-1` if it sweeping
-                # rightwards
-                apply!(
-                    cb,
-                    states...,
-                    TDVP1();
-                    t=current_time + dt,
-                    site=site,
-                    sweepend=(ha == 2),
+    printoutput_data(io_handle, cb, states...; kwargs...)
+    printoutput_ranks(ranks_handle, cb, states...)
+
+    for s in 1:nsteps
+        # In TDVP1 only one site at a time is modified, so we iterate on the sites
+        # of the state's MPS, not the bonds.
+        stime = @elapsed for (site, ha) in sweepnext(N; ncenter=1)
+            # sweepnext(N) is an iterable object that evaluates to tuples of the form
+            # (bond, ha) where bond is the bond number and ha is the half-sweep number.
+            # The kwarg ncenter determines the end and turning points of the loop: if
+            # it equals 1, then we perform a sweep on each single site.
+
+            # ha == 1  =>  left-to-right sweep
+            # ha == 2  =>  right-to-left sweep
+            sweepdir = (ha == 1 ? "right" : "left")
+            for (state, PH) in zip(states, projections)
+                tdvp_site_update!(
+                    solver,
+                    PH,
+                    state,
+                    site,
+                    -0.5evol_dt; # forward by -im*dt/2, backwards by im*dt/2.
+                    current_time=(ha == 1 ? current_time + 0.5dt : current_time + dt),
                     sweepdir=sweepdir,
+                    which_decomp=decomp,
+                    hermitian=hermitian,
+                    exp_tol=exp_tol,
+                    krylovdim=krylovdim,
+                    maxiter=maxiter,
                 )
             end
+            # At least with TDVP1, `tdvp_site_update!` updates the site at `site`, and
+            # leaves the MPS with orthocenter at `site+1` or `site-1` if it sweeping
+            # rightwards
         end
 
         current_time += dt
+
+        apply!(cb, states..., TDVP1(); t=current_time, sweepend=true, sweepdir="left")
 
         !isnothing(pbar) && ProgressMeter.next!(
             pbar; showvalues=simulationinfo(states, current_time, stime)
