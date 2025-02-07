@@ -55,35 +55,62 @@ end
 
 checkdone!(cb::ExpValueCallback, args...) = false
 
-"""
-    measure_localops!(cb::ExpValueCallback, ψ::MPS, site::Int, alg::TDVP1)
+function _expval_while_sweeping(state::MPS, l::LocalOperator)
+    # Find the relevant site range as the smallest interval of (consecutive) sites that
+    # includes the orthocentre of the state and the support of the operator. We contract
+    # the MPS only on those sites, and rely on the canonical simplification rules for the
+    # other tensors.
+    # This function is (ideally) called with `l` such that the lower bound of its domain
+    # is also the orthocentre of the state MPS, but let's calculate the site range in a more
+    # generic way anyway.
+    site_range =
+        minimum([orthocenter(state); domain(l)]):maximum([orthocenter(state); domain(l)])
 
-Measure each operator defined inside the callback object `cb` on the state `ψ` at site `i`.
-"""
-function measure_localops!(cb::ExpValueCallback, ψ::MPS, site::Int, alg::TDVP1)
-    # Since the operators may be defined on more than one site, we need to check that
-    # all the sites in their domain have been completely updated: this means that we must
-    # wait until the final sweep of the evolution step has passed each site in the domain.
-    # Note that this function gets called (or should be called) only if the current sweep
-    # is the final sweep in the step.
+    x = ITensors.OneITensor()
+    for n in site_range
+        if n in domain(l)
+            x *=
+                prime(dag(state[n]); tags="Link") *
+                apply(op(l[n], siteind(state, n)), state[n])
+        else
+            x *= prime(dag(state[n]); tags="Link") * state[n]
+        end
+    end
+    # Now `x` is a tensor with indices
+    #   (dim=##|id=##|"Link,l=L")'
+    #   (dim=##|id=##|"Link,l=L")
+    #   (dim=##|id=##|"Link,l=R")'
+    #   (dim=##|id=##|"Link,l=R")
+    # where L is the minimum of `site_range` and R its maximum. We contract these dangling
+    # indices and obtain the expectation value. Anyway there will be two pairs of
+    # primed/unprimed indices to contract. We'll find them and pair them in a more automatic
+    # way, without looking at their site number (let's not rely on the presence of this tag,
+    # in the future it may not be there anymore).
+    i0 = inds(x; plev=0)
+    i1 = inds(x; plev=1)
+    for j in i0
+        k = i1[findfirst(isequal(j'), i1)]
+        x *= delta(j, k)
+    end
+    return scalar(x)
+end
 
-    # When `ψ[site]` has been updated during the leftwards sweep, the orthocentre lies on
-    # site `max(1, site-1)`, and all `ψ[n]` with `n >= site` are correctly updated.
-    measurable_operators = filter(op -> site <= first(domain(op)), ops(cb))
-    s = siteinds(ψ)
-    for localop in measurable_operators
-        # This works, but calculating the MPO from scratch every time might take too much
-        # time, especially when it has to be repeated thousands of times. For example,
-        # executing TimeEvoVecMPS.mpo(s, o) with
-        #   s = siteinds("Osc", 400; dim=16)
-        #   o = LocalOperator(Dict(20 => "A", 19 => "Adag"))
-        # takes 177.951 ms (2313338 allocations: 329.80 MiB).
-        # Memoizing this function allows us to cut the time (after the first call, which is
-        # expensive anyway since Julia needs to compile the function) to 45.368 ns
-        # (1 allocation: 32 bytes) for each call.
-        measurements(cb)[localop][end] = dot(ψ', mpo(s, localop), ψ)
-        # measurements(cb)[localop][end] is the last line in the measurements of localop,
-        # which we (must) have created in apply! before calling this function.
+"""
+    measure_localops!(cb::ExpValueCallback, state::MPS, site::Int, alg::TDVP1)
+
+Measure on the MPS `state` each operator whose support starts on `site` defined inside the
+callback object `cb`.
+"""
+function measure_localops!(cb::ExpValueCallback, state::MPS, site::Int, alg::TDVP1)
+    # The `state[site]` block has just been updated and we should be in the middle of an
+    # evolution step, before the 0-site evolution happens and the orthocentre of the state
+    # is shifted left. We will measure all operators whose support starts on `site`.
+    # Operators whose support is contained in `site+1:end` have already been measured in
+    # previous calls of this function.
+    for localop in filter(l -> first(domain(l)) == site, ops(cb))
+        measurements(cb)[localop][end] = _expval_while_sweeping(state, localop)
+        # `measurements(cb)[localop][end]` is the last line in the measurements of `localop`
+        # which we (must) have created in `apply!` before calling this function.
     end
 end
 
@@ -147,7 +174,10 @@ function apply!(
     cb::ExpValueCallback, state::MPS, alg::TDVP1; t, sweepend, sweepdir, site, kwargs...
 )
     if isempty(measurement_ts(cb))
-        prev_t = 0
+        prev_t = 0.0
+        # Initialize `cb` here.
+        push!(measurement_ts(cb), t)
+        foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
     else
         prev_t = measurement_ts(cb)[end]
     end
@@ -156,7 +186,7 @@ function apply!(
     # For TDVP we can perform measurements to the right of each site when sweeping back left.
     if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend && sweepdir == "left"
         @debug "Computing expectation values on site $site at t = $t (prev_t = $prev_t)"
-        if (t != prev_t || t == 0)
+        if t != prev_t
             # Add the current time to the list of time instants at which we measured
             # something.
             push!(measurement_ts(cb), t)
