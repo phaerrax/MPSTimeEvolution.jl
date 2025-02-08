@@ -90,7 +90,7 @@ function _expval_while_sweeping(state::MPS, l::LocalOperator)
     i1 = inds(x; plev=1)
     for j in i0
         k = i1[findfirst(isequal(j'), i1)]
-        x *= delta(j, k)
+        x *= delta(dag(j), dag(k))
     end
     return scalar(x)
 end

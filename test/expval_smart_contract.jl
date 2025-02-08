@@ -1,8 +1,8 @@
 function expval_smart_contract(; N=10)
     N = min(8, N)
     # Check the correct behaviour of the `_expval_while_sweeping` function.
-    s = siteinds("Boson", N; dim=4)
-    x = random_mps(s; linkdims=4)
+    s = siteinds("Boson", N; dim=4, conserve_number=true)
+    x = random_mps(s, n -> isodd(n) ? "1" : "0"; linkdims=4)
 
     onesite = [LocalOperator(1 => "n"), LocalOperator(3 => "n")]
     twosite = [
