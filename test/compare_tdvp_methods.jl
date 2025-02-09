@@ -240,14 +240,7 @@ function siam_adjtdvp1vec(; dt, tmax, N, check_sites)
     results = []
     time = Float64[]
     for l in MPSTimeEvolution.ops(cb)
-        targetop = MPS(
-            ComplexF64,
-            sites,
-            [
-                i in MPSTimeEvolution.domain(l) ? "v" * l[i] : "vId" for
-                i in eachindex(sites)
-            ],
-        )
+        targetop = MPSTimeEvolution.mps(sites, l)
         maxbonddim = maximum(maxlinkdims(targetop))
         growMPS!(targetop, maxbonddim)
 

@@ -42,22 +42,11 @@ function expval_vec(; N=10)
     MPSTimeEvolution.apply!(cb, x, MPSTimeEvolution.TDVP1vec(); t=0, sweepend=true)
     ev_cb = [MPSTimeEvolution.measurements(cb)[l][end] for l in MPSTimeEvolution.ops(cb)]
 
-    ev_inner = [
-        inner(
-            # We need to use `dag` on the operator MPS here because ⟨A,ρ⟩ = tr(A*ρ).
-            dag(
-                MPS(
-                    ComplexF64,
-                    s,
-                    [
-                        i in MPSTimeEvolution.domain(l) ? "v" * l[i] : "vId" for
-                        i in eachindex(x)
-                    ],
-                ),
-            ),
-            x,
-        ) for l in MPSTimeEvolution.ops(cb)
-    ]
+    ev_inner = [inner(
+        # We need to use `dag` on the operator MPS here because ⟨A,ρ⟩ = tr(A*ρ).
+        dag(MPSTimeEvolution.mps(s, l)),
+        x,
+    ) for l in MPSTimeEvolution.ops(cb)]
 
     return all(ev_cb .≈ ev_inner)
 end
