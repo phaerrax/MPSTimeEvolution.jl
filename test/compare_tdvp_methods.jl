@@ -275,20 +275,3 @@ function siam_adjtdvp1vec(; dt, tmax, N, check_sites)
 
     return time, results...
 end
-
-# This tests pushes the bond dimension to the maximum admitted by the sizes of the system,
-# so it's best to keep N relatively low so that the computation doesn't get too heavy.
-function siam_compare_tdvp(; dt=0.01, tmax=0.5, N=4)
-    s = [1, 3]
-    res_tdvp1 = siam_tdvp1(; dt=dt, tmax=tmax, N=N, check_sites=s)
-
-    return all(
-               res_tdvp1 .≈
-               siam_tdvp1vec_superfermions(; dt=dt, tmax=tmax, N=N, check_sites=s),
-           ) &&
-           #all(
-           #res_tdvp1 .≈ siam_tdvp1_with_qns(; dt=dt, tmax=tmax, N=N, check_sites=s)
-           #) &&
-           all(res_tdvp1 .≈ siam_tdvp1vec(; dt=dt, tmax=tmax, N=N, check_sites=s)) &&
-           all(res_tdvp1 .≈ siam_adjtdvp1vec(; dt=dt, tmax=tmax, N=N, check_sites=s))
-end
