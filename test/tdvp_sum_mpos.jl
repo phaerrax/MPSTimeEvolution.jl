@@ -14,7 +14,7 @@ function siam_tdvp1vec_single_mpo(; dt, tmax, N)
     ℓ = spin_chain(freqs, coups, sites)
     L = MPO(ℓ, sites)
 
-    operators = [LocalOperator(Dict(1 => "vN")), LocalOperator(Dict(5 => "vN"))]
+    operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
     cb = ExpValueCallback(operators, sites, dt)
 
     tmpfile = tempname()
@@ -33,8 +33,8 @@ function siam_tdvp1vec_single_mpo(; dt, tmax, N)
 
     f = CSV.File(tmpfile)
     return f["time"],
-    complex.(f["vN{1}_re"], f["vN{1}_im"]) ./ f["Norm"],
-    complex.(f["vN{5}_re"], f["vN{5}_im"]) ./ f["Norm"]
+    complex.(f["N{1}_re"], f["N{1}_im"]) ./ f["Norm"],
+    complex.(f["N{5}_re"], f["N{5}_im"]) ./ f["Norm"]
 end
 
 function siam_tdvp1vec_two_mpos(; dt, tmax, N)
@@ -60,7 +60,7 @@ function siam_tdvp1vec_two_mpos(; dt, tmax, N)
     L1 = MPO(ℓ1, sites)
     L2 = MPO(ℓ2, sites)
 
-    operators = [LocalOperator(Dict(1 => "vN")), LocalOperator(Dict(5 => "vN"))]
+    operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
     cb = ExpValueCallback(operators, sites, dt)
 
     tmpfile = tempname()
@@ -79,8 +79,8 @@ function siam_tdvp1vec_two_mpos(; dt, tmax, N)
 
     f = CSV.File(tmpfile)
     return f["time"],
-    complex.(f["vN{1}_re"], f["vN{1}_im"]) ./ f["Norm"],
-    complex.(f["vN{5}_re"], f["vN{5}_im"]) ./ f["Norm"]
+    complex.(f["N{1}_re"], f["N{1}_im"]) ./ f["Norm"],
+    complex.(f["N{5}_re"], f["N{5}_im"]) ./ f["Norm"]
 end
 
 # This tests pushes the bond dimension to the maximum admitted by the sizes of the system,

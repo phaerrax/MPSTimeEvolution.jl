@@ -18,6 +18,8 @@ include("tdvp_sum_mpos.jl")
 end
 
 include("expval_smart_contract.jl")
-@testset "Expectation value with smart contraction" begin
+@testset "Expectation value with smart contractions" begin
     @test expval_smart_contract()
+    @test expval_vec()
+    @test expval_vec_sf()
 end

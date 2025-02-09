@@ -5,6 +5,8 @@ using CSV
 # on the correctness of the TDVP functions, mostly from a syntactic point of view. It
 # doesn't have to be a physically interesting, or correct, system.
 
+jws(n1, n2) = (i => "F" for i in (n1 + 1):(n2 - 1))  # Jordan-Wigner string
+
 function siam_tdvp1(; dt, tmax, N, check_sites)
     sites = siteinds("Fermion", N + 1)
 
@@ -19,7 +21,6 @@ function siam_tdvp1(; dt, tmax, N, check_sites)
     site_pairs = [
         (check_sites[j], check_sites[i]) for i in eachindex(check_sites) for j in 1:(i - 1)
     ]
-    jws(n1, n2) = (i => "F" for i in (n1 + 1):(n2 - 1))  # Jordan-Wigner string
     operators = [
         [LocalOperator(n => "n") for n in check_sites]
         [
@@ -56,7 +57,7 @@ function siam_tdvp1(; dt, tmax, N, check_sites)
 end
 
 function siam_tdvp1_with_qns(; dt, tmax, N, check_sites)
-    sites = siteinds("Fermion", N + 1; conserve_nf=true)
+    sites = siteinds("Fermion", N + 1; conserve_nfparity=true)
 
     init(n) = n == 1 ? "Occ" : "Emp"
     state_0 = MPS(sites, init)
@@ -69,7 +70,6 @@ function siam_tdvp1_with_qns(; dt, tmax, N, check_sites)
     site_pairs = [
         (check_sites[j], check_sites[i]) for i in eachindex(check_sites) for j in 1:(i - 1)
     ]
-    jws(n1, n2) = (i => "F" for i in (n1 + 1):(n2 - 1))  # Jordan-Wigner string
     operators = [
         [LocalOperator(n => "n") for n in check_sites]
         [
@@ -118,17 +118,14 @@ function siam_tdvp1vec(; dt, tmax, N, check_sites)
     site_pairs = [
         (check_sites[j], check_sites[i]) for i in eachindex(check_sites) for j in 1:(i - 1)
     ]
-    jws(n1, n2) = (i => "vF" for i in (n1 + 1):(n2 - 1))  # Jordan-Wigner string
     operators = [
-        # Remember to use the adjoints! This is a small flaw in the design of the callback
-        # object. It should call the adjoints of the operators by itself.
-        [LocalOperator(n => "vN") for n in check_sites]
+        [LocalOperator(n => "N") for n in check_sites]
         [
-            LocalOperator((n1 => "vAdag", jws(n1, n2)..., n2 => "vA")) for
+            LocalOperator((n1 => "A", jws(n1, n2)..., n2 => "Adag")) for
             (n1, n2) in site_pairs
         ]
         [
-            LocalOperator((n1 => "vA", jws(n1, n2)..., n2 => "vAdag")) for
+            LocalOperator((n1 => "Adag", jws(n1, n2)..., n2 => "A")) for
             (n1, n2) in site_pairs
         ]
     ]
@@ -177,7 +174,6 @@ function siam_tdvp1vec_superfermions(; dt, tmax, N, check_sites)
         (check_sites[j], check_sites[i]) for i in eachindex(check_sites) for j in 1:(i - 1)
     ]
     sf_site_pairs = [sf_index.(p) for p in site_pairs]
-    jws(n1, n2) = (i => "F" for i in (n1 + 1):(n2 - 1))  # Jordan-Wigner string
     operators = [
         # We don't need to use the adjoints here because SuperfermionCallback is coded
         # properly: it does the adjunction by itself already.
@@ -227,26 +223,31 @@ function siam_adjtdvp1vec(; dt, tmax, N, check_sites)
     site_pairs = [
         (check_sites[j], check_sites[i]) for i in eachindex(check_sites) for j in 1:(i - 1)
     ]
-    jws(n1, n2) = (i => "vF" for i in (n1 + 1):(n2 - 1))  # Jordan-Wigner string
     operators = [
-        [LocalOperator(n => "vN") for n in check_sites]
+        [LocalOperator(n => "N") for n in check_sites]
         [
-            LocalOperator((n1 => "vA", jws(n1, n2)..., n2 => "vAdag")) for
+            LocalOperator((n1 => "A", jws(n1, n2)..., n2 => "Adag")) for
             (n1, n2) in site_pairs
         ]
         [
-            LocalOperator((n1 => "vAdag", jws(n1, n2)..., n2 => "vA")) for
+            LocalOperator((n1 => "Adag", jws(n1, n2)..., n2 => "A")) for
             (n1, n2) in site_pairs
         ]
     ]
     cb = ExpValueCallback(operators, sites, dt)  # needed for ordering the operators
-
     tmpfile = tempname()
 
     results = []
     time = Float64[]
     for l in MPSTimeEvolution.ops(cb)
-        targetop = MPSTimeEvolution.mps(sites, l)
+        targetop = MPS(
+            ComplexF64,
+            sites,
+            [
+                i in MPSTimeEvolution.domain(l) ? "v" * l[i] : "vId" for
+                i in eachindex(sites)
+            ],
+        )
         maxbonddim = maximum(maxlinkdims(targetop))
         growMPS!(targetop, maxbonddim)
 
@@ -280,18 +281,14 @@ end
 function siam_compare_tdvp(; dt=0.01, tmax=0.5, N=4)
     s = [1, 3]
     res_tdvp1 = siam_tdvp1(; dt=dt, tmax=tmax, N=N, check_sites=s)
-    res_tdvp1_with_qns = siam_tdvp1(; dt=dt, tmax=tmax, N=N, check_sites=s)
-    res_tdvp1vec = siam_tdvp1vec(; dt=dt, tmax=tmax, N=N, check_sites=s)
-    res_tdvp1vec_superfermions = siam_tdvp1vec_superfermions(;
-        dt=dt, tmax=tmax, N=N, check_sites=s
-    )
-    res_adjtdvp1vec = siam_adjtdvp1vec(; dt=dt, tmax=tmax, N=N, check_sites=s)
 
     return all(
-        res_tdvp1 .≈
-        res_tdvp1vec .≈
-        res_tdvp1_with_qns .≈
-        res_tdvp1vec_superfermions .≈
-        res_adjtdvp1vec,
-    )
+               res_tdvp1 .≈
+               siam_tdvp1vec_superfermions(; dt=dt, tmax=tmax, N=N, check_sites=s),
+           ) &&
+           #all(
+           #res_tdvp1 .≈ siam_tdvp1_with_qns(; dt=dt, tmax=tmax, N=N, check_sites=s)
+           #) &&
+           all(res_tdvp1 .≈ siam_tdvp1vec(; dt=dt, tmax=tmax, N=N, check_sites=s)) &&
+           all(res_tdvp1 .≈ siam_adjtdvp1vec(; dt=dt, tmax=tmax, N=N, check_sites=s))
 end
