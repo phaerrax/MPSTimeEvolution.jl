@@ -92,32 +92,63 @@ Note that it is not the same as ITensors.adjoint.
 """
 adj(x) = swapprime(dag(x), 0 => 1)
 
-@memoize function _sf_observable_mps(op, sites)
-    id = identity_sf(sites)
-    x = mpo(sites, op)
-    return apply(adj(x), id)
+@memoize function _sf_id_pairs(ψ)
+    return [
+        state(siteind(ψ, n), "Emp") * state(siteind(ψ, n + 1), "Emp") +
+        state(siteind(ψ, n), "Occ") * state(siteind(ψ, n + 1), "Occ") for
+        n in eachindex(ψ)[1:2:end]
+    ]
 end
 
 """
-    measure_localops!(cb::SuperfermionCallback, state::MPS, alg::TDVP1vec)
+    measure_localops!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec)
 
-Measure each operator defined inside the callback object `cb` on the state `state`.
+Measure each operator defined inside the callback object `cb` on the state `ψ`.
 """
-function measure_localops!(cb::SuperfermionCallback, state::MPS, alg::TDVP1vec)
-    # With TDVP1vec algorithms the situation is much simpler than with simple TDVP1: since
-    # we need to contract any site which is not "occupied" (by the operator which is to be
-    # measured) anyway with vec(I), we don't need to care about the orthocenter, we just
-    # measure everything at the end of the sweep.
+function measure_localops!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec)
+    # We follow the same logic as in
+    # `measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)`, but we work with
+    # 2-site blocks at a time.
 
-    for localop in ops(cb)
-        # Strategy:
-        # 1. create the identity MPS (the so-called “left vacuum”)
-        # 2. apply the adjoint of the local operator to it (this way we can memoize it)
-        # 3. contract the result with the state
-        measurements(cb)[localop][end] = dot(_sf_observable_mps(localop, sites(cb)), state)
-        # measurements(cb)[localop][end] is the last element in the measurements of localop,
-        # which we (must) have created in apply! before calling this function.
+    # Contract each tensor from `ψ` with the identity, separately.
+    no_id_sites = intersect([domain(l) for l in ops(cb)]...)
+    # (We don't need the identity on those sites.)
+
+    sf_id_blocks = _sf_id_pairs(ψ)
+    ids = [
+        if n in no_id_sites
+            OneITensor()
+        else
+            dag(sf_id_blocks[div(n + 1, 2)]) * ψ[n] * ψ[n + 1]
+        end for n in eachindex(ψ)[1:2:end]
+    ]
+    # Where the identity is not needed, we put a OneITensor as a placeholder, so that the
+    # site enumeration is preserved.
+
+    for l in ops(cb)
+        # Compute the expectation values by multiplying the tensor of the LocalOperator and
+        # the precomputed identities on the other sites.
+        x = OneITensor()
+        for n in eachindex(ψ)[1:2:end]
+            if n in domain(l)
+                lop = if n + 1 in domain(l)
+                    # We loop over odd sites only, so we check manually that the next site
+                    # is in the domain of the operator.
+                    op(l[n], siteind(ψ, n)) * op(l[n + 1], siteind(ψ, n + 1))
+                else
+                    op(l[n], siteind(ψ, n))
+                end
+                x *= dag(apply(adj(lop), sf_id_blocks[div(n + 1, 2)])) * ψ[n] * ψ[n + 1]
+            else
+                x *= ids[div(n + 1, 2)]
+            end
+        end
+        measurements(cb)[l][end] = scalar(x)
+        # `measurements(cb)[l][end]` is the last element in the measurements of `l`,
+        # which we (must) have created in `apply!` before calling this function.
     end
+
+    return nothing
 end
 
 function apply!(cb::SuperfermionCallback, state::MPS, alg::TDVP1vec; t, sweepend, kwargs...)

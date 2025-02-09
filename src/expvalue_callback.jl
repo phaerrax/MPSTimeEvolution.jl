@@ -1,3 +1,5 @@
+using ITensors: OneITensor
+
 export ExpValueCallback
 
 const ExpValueSeries = Vector{ComplexF64}
@@ -66,7 +68,7 @@ function _expval_while_sweeping(state::MPS, l::LocalOperator)
     site_range =
         minimum([orthocenter(state); domain(l)]):maximum([orthocenter(state); domain(l)])
 
-    x = ITensors.OneITensor()
+    x = OneITensor()
     for n in site_range
         if n in domain(l)
             x *=
@@ -112,6 +114,8 @@ function measure_localops!(cb::ExpValueCallback, state::MPS, site::Int, alg::TDV
         # `measurements(cb)[localop][end]` is the last line in the measurements of `localop`
         # which we (must) have created in `apply!` before calling this function.
     end
+
+    return nothing
 end
 
 """
@@ -125,15 +129,7 @@ function measure_localops!(cb::ExpValueCallback, psiL::MPS, psiR::MPS, alg::TDVP
     # operator are different, so the "free" tensors do not cancel when contracting.
     # This function is meant to be called at the end of the sweep.
     for l in ops(cb)
-        # This works, but calculating the MPO from scratch every time might take too much
-        # time, especially when it has to be repeated thousands of times. For example,
-        # executing TimeEvoVecMPS.mpo(s, o) with
-        #   s = siteinds("Osc", 400; dim=16)
-        #   o = LocalOperator(Dict(20 => "A", 19 => "Adag"))
-        # takes 177.951 ms (2313338 allocations: 329.80 MiB).
-        # Memoizing this function allows us to cut the time (after the first call, which is
-        # expensive anyway since Julia needs to compile the function) to 45.368 ns
-        # (1 allocation: 32 bytes) for each call.
+        # TODO Consider whether it makes sense to memoize the product of operators here.
         lop = prod(
             op(opname, siteind(psiR, opsite)) for
             (opname, opsite) in zip(factors(l), domain(l))
@@ -142,6 +138,8 @@ function measure_localops!(cb::ExpValueCallback, psiL::MPS, psiR::MPS, alg::TDVP
         # measurements(cb)[localop][end] is the last line in the measurements of localop,
         # which we (must) have created in apply! before calling this function.
     end
+
+    return nothing
 end
 
 """
@@ -155,12 +153,44 @@ function measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)
     # measured) anyway with vec(I), we don't need to care about the orthocenter, we just
     # measure everything at the end of the sweep.
 
-    for localop in ops(cb)
-        # Transform each `localop` into an MPS, filling with `vId` states.
-        measurements(cb)[localop][end] = dot(mps(sites(cb), localop), ψ)
-        # measurements(cb)[localop][end] is the last element in the measurements of localop,
-        # which we (must) have created in apply! before calling this function.
+    # Contract each tensor from `ψ` with the identity, separately.
+    no_id_sites = intersect([domain(l) for l in ops(cb)]...)
+    # (We don't need the identity on those sites.)
+
+    ids = [
+        n in no_id_sites ? OneITensor() : state("vId", siteind(ψ, n)) * ψ[n] for
+        n in eachindex(ψ)
+    ]
+    # Where the identity is not needed, we put a OneITensor as a placeholder, so that the
+    # site enumeration is preserved.
+
+    for l in ops(cb)
+        # Compute the expectation values by multiplying the tensor of the LocalOperator and
+        # the precomputed identities on the otherx sites.
+        x = OneITensor()
+        for n in eachindex(ψ)
+            if n in domain(l)
+                x *= state("v" * l[n], siteind(ψ, n)) * ψ[n]
+                # Note that contrary to `inner` or `dot`, this simple product of tensors
+                # does not imply any complex conjugation, i.e.
+                #
+                #   state("vA", s) = apply(op("A⋅", s), state("vId", s))
+                #
+                # behaves as follows (`t` is an ITensor with index `s`):
+                #
+                #   state("vA", s) * t == state("vId", s) * apply(op("A⋅", s), t)
+                #
+                # so we should not use `dag` on the measured operator here.
+            else
+                x *= ids[n]
+            end
+        end
+        measurements(cb)[l][end] = scalar(x)
+        # `measurements(cb)[l][end]` is the last element in the measurements of `l`,
+        # which we (must) have created in `apply!` before calling this function.
     end
+
+    return nothing
 end
 
 function apply!(
