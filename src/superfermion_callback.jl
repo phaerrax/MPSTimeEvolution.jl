@@ -4,6 +4,7 @@ struct SuperfermionCallback <: TEvoCallback
     operators::Vector{LocalOperator}
     sites::Vector{<:Index}
     measurements::Dict{LocalOperator,ExpValueSeries}
+    norm::ExpValueSeries
     times::Vector{Float64}
     measure_timestep::Float64
 end
@@ -30,6 +31,7 @@ function SuperfermionCallback(
         operators,
         sites,
         Dict(op => ExpValueSeries() for op in operators),
+        ExpValueSeries(),
         # A single ExpValueSeries for each operator in the list.
         Vector{Float64}(),
         measure_timestep,
@@ -38,6 +40,7 @@ end
 
 measurement_ts(cb::SuperfermionCallback) = cb.times
 measurements(cb::SuperfermionCallback) = cb.measurements
+measurements_norm(cb::SuperfermionCallback) = cb.norm
 callback_dt(cb::SuperfermionCallback) = cb.measure_timestep
 ops(cb::SuperfermionCallback) = cb.operators
 sites(cb::SuperfermionCallback) = cb.sites
@@ -111,16 +114,9 @@ function measure_localops!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec)
     # 2-site blocks at a time.
 
     # Contract each tensor from `ψ` with the identity, separately.
-    no_id_sites = intersect([domain(l) for l in ops(cb)]...)
-    # (We don't need the identity on those sites.)
-
     sf_id_blocks = _sf_id_pairs(ψ)
     ids = [
-        if n in no_id_sites
-            OneITensor()
-        else
-            dag(sf_id_blocks[div(n + 1, 2)]) * ψ[n] * ψ[n + 1]
-        end for n in eachindex(ψ)[1:2:end]
+        dag(sf_id_blocks[div(n + 1, 2)]) * ψ[n] * ψ[n + 1] for n in eachindex(ψ)[1:2:end]
     ]
     # Where the identity is not needed, we put a OneITensor as a placeholder, so that the
     # site enumeration is preserved.
@@ -148,6 +144,9 @@ function measure_localops!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec)
         # which we (must) have created in `apply!` before calling this function.
     end
 
+    # Now measure the trace, too.
+    measurements_norm(cb)[end] = scalar(prod(ids))
+
     return nothing
 end
 
@@ -165,6 +164,7 @@ function apply!(cb::SuperfermionCallback, state::MPS, alg::TDVP1vec; t, sweepend
             push!(measurement_ts(cb), t)
             # Create a new slot in which we will put the measurement result.
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
+            push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
         end
         measure_localops!(cb, state, alg)
     end

@@ -33,8 +33,8 @@ function siam_tdvp1vec_single_mpo(; dt, tmax, N)
 
     f = CSV.File(tmpfile)
     return f["time"],
-    complex.(f["N{1}_re"], f["N{1}_im"]) ./ f["Norm"],
-    complex.(f["N{5}_re"], f["N{5}_im"]) ./ f["Norm"]
+    complex.(f["N{1}_re"], f["N{1}_im"]) ./ complex.(f["Norm_re"], f["Norm_im"]),
+    complex.(f["N{5}_re"], f["N{5}_im"]) ./ complex.(f["Norm_re"], f["Norm_im"])
 end
 
 function siam_tdvp1vec_two_mpos(; dt, tmax, N)
@@ -79,8 +79,8 @@ function siam_tdvp1vec_two_mpos(; dt, tmax, N)
 
     f = CSV.File(tmpfile)
     return f["time"],
-    complex.(f["N{1}_re"], f["N{1}_im"]) ./ f["Norm"],
-    complex.(f["N{5}_re"], f["N{5}_im"]) ./ f["Norm"]
+    complex.(f["N{1}_re"], f["N{1}_im"]) ./ complex.(f["Norm_re"], f["Norm_im"]),
+    complex.(f["N{5}_re"], f["N{5}_im"]) ./ complex.(f["Norm_re"], f["Norm_im"])
 end
 
 # This tests pushes the bond dimension to the maximum admitted by the sizes of the system,

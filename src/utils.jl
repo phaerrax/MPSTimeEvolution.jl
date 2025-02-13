@@ -44,7 +44,7 @@ function writeheaders_data(io_file, cb; kwargs...)
             push!(columnheaders, "overlap_re", "overlap_im")
         end
 
-        push!(columnheaders, "Norm")
+        push!(columnheaders, "Norm_re", "Norm_im")
 
         println(io_handle, join(columnheaders, ","))
     end
@@ -139,16 +139,8 @@ function printoutput_data(io_handle, cb, psi::MPS; kwargs...)
 
         # Print the norm of the trace of the state, depending on whether the MPS represents
         # a pure state or a vectorized density matrix.
-        if get(kwargs, :vectorized, false)
-            if get(kwargs, :superfermions, false)
-                push!(data, real(dot(identity_sf(siteinds(psi)), psi)))
-            else
-                # TODO Use built-in trace function, do not create an MPS from scratch each time!
-                push!(data, real(inner(MPS(siteinds(psi), "vId"), psi)))
-            end
-        else
-            push!(data, norm(psi))
-        end
+        n = measurements_norm(cb)[end]
+        push!(data, real(n), imag(n))
 
         println(io_handle, join(data, ","))
         flush(io_handle)
@@ -166,7 +158,7 @@ function printoutput_data(io_handle, cb, state1::MPS, state2::MPS; kwargs...)
             push!(data, real(x), imag(x))
         end
 
-        ol = dot(state1, state2)
+        ol = measurements_norm(cb)[end]
         push!(data, real(ol), imag(ol))
 
         if get(kwargs, :store_psi0, false)
@@ -177,16 +169,8 @@ function printoutput_data(io_handle, cb, state1::MPS, state2::MPS; kwargs...)
             end
         end
 
-        # Print the norm of the trace of the state, depending on whether the MPS represents
-        # a pure state or a vectorized density matrix.
-        isvectorized = get(kwargs, :vectorized, false)
-        if isvectorized
-            # TODO Use built-in trace function, do not create an MPS from scratch each time!
-            id = MPS(siteinds(state1), "vId")
-            push!(data, real(inner(id, state1)), real(inner(id, state2)))
-        else
-            push!(data, norm(state1), norm(state2))
-        end
+        # Print the norm the trace of the states.
+        push!(data, norm(state1), norm(state2))
 
         println(io_handle, join(data, ","))
         flush(io_handle)

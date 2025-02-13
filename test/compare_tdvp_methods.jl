@@ -1,6 +1,3 @@
-using CSV
-using Observers: observer
-
 jws(n1, n2) = (i => "F" for i in (n1 + 1):(n2 - 1))  # Jordan-Wigner string
 
 function itensors_tdvp(; dt, tmax, N, check_sites, init)
@@ -122,7 +119,7 @@ function siam_tdvp1(; dt, tmax, N, check_sites, init)
 
     f = CSV.File(tmpfile)
     results = [
-        complex.(f["$(l)_re"], f["$(l)_im"]) for
+        complex.(f["$(l)_re"], f["$(l)_im"]) ./ complex.(f["Norm_re"], f["Norm_im"]) for
         l in MPSTimeEvolution.name.(MPSTimeEvolution.ops(cb))
     ]
     return f["time"], results...
@@ -170,7 +167,7 @@ function siam_tdvp1_with_qns(; dt, tmax, N, check_sites, init)
 
     f = CSV.File(tmpfile)
     results = [
-        complex.(f["$(l)_re"], f["$(l)_im"]) for
+        complex.(f["$(l)_re"], f["$(l)_im"]) ./ complex.(f["Norm_re"], f["Norm_im"]) for
         l in MPSTimeEvolution.name.(MPSTimeEvolution.ops(cb))
     ]
     return f["time"], results...
@@ -218,7 +215,7 @@ function siam_tdvp1vec(; dt, tmax, N, check_sites, init)
 
     f = CSV.File(tmpfile)
     results = [
-        complex.(f["$(l)_re"], f["$(l)_im"]) for
+        complex.(f["$(l)_re"], f["$(l)_im"]) ./ complex.(f["Norm_re"], f["Norm_im"]) for
         l in MPSTimeEvolution.name.(MPSTimeEvolution.ops(cb))
     ]
     return f["time"], results...
@@ -280,7 +277,7 @@ function siam_tdvp1vec_superfermions(; dt, tmax, N, check_sites, init)
 
     f = CSV.File(tmpfile)
     results = [
-        complex.(f["$(l)_re"], f["$(l)_im"]) for
+        complex.(f["$(l)_re"], f["$(l)_im"]) ./ complex.(f["Norm_re"], f["Norm_im"]) for
         l in MPSTimeEvolution.name.(MPSTimeEvolution.ops(cb))
     ]
     return f["time"], results...

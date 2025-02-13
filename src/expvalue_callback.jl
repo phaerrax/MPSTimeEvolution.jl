@@ -8,6 +8,7 @@ struct ExpValueCallback <: TEvoCallback
     operators::Vector{LocalOperator}
     sites::Vector{<:Index}
     measurements::Dict{LocalOperator,ExpValueSeries}
+    norm::ExpValueSeries
     times::Vector{Float64}
     measure_timestep::Float64
 end
@@ -20,8 +21,11 @@ end
 Construct an `ExpValueCallback`, providing an array `operators` of `LocalOperator` objects
 representing operators associated to specific sites. Each of them will be measured
 on the given site during every step of the time evolution, and the results recorded inside
-the `ExpValueCallback` object as an `ExpValueSeries` for later analysis. The array
-`sites` is the same basis of sites used to define the MPS and MPO for the calculations.
+the `ExpValueCallback` object as an `ExpValueSeries` for later analysis. The norm of the
+state, or the an equivalent quantity (trace, overlap of two sites...) where applicable, will
+also be computed after each step.
+The array `sites` is the same list of sites indices used to define MPSs and MPOs for the
+calculations.
 """
 function ExpValueCallback(
     operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
@@ -29,9 +33,10 @@ function ExpValueCallback(
     return ExpValueCallback(
         operators,
         sites,
-        Dict(op => ExpValueSeries() for op in operators),
+        Dict(x => ExpValueSeries() for x in operators),
         # A single ExpValueSeries for each operator in the list.
-        Vector{Float64}(),
+        ExpValueSeries(),  # for the norm, or the trace
+        Vector{Float64}(),  # time instants of measurement steps
         measure_timestep,
     )
 end
@@ -39,6 +44,7 @@ end
 measurement_ts(cb::ExpValueCallback) = cb.times
 measurements(cb::ExpValueCallback) = cb.measurements
 callback_dt(cb::ExpValueCallback) = cb.measure_timestep
+measurements_norm(cb::ExpValueCallback) = cb.norm
 ops(cb::ExpValueCallback) = cb.operators
 sites(cb::ExpValueCallback) = cb.sites
 
@@ -115,6 +121,11 @@ function measure_localops!(cb::ExpValueCallback, state::MPS, site::Int, alg::TDV
         # which we (must) have created in `apply!` before calling this function.
     end
 
+    if site == 1
+        measurements_norm(cb)[end] = norm(state)
+        # No optimisation needed here---ITensors uses the orthocentre only already.
+    end
+
     return nothing
 end
 
@@ -130,6 +141,8 @@ function measure_localops!(cb::ExpValueCallback, psiL::MPS, psiR::MPS, alg::TDVP
     # This function is meant to be called at the end of the sweep.
     for l in ops(cb)
         # TODO Consider whether it makes sense to memoize the product of operators here.
+        # We could at least save the partial contractions, since we're measuring all the
+        # observables at the same time (if anything, we get the overlap as a bonus).
         lop = prod(
             op(opname, siteind(psiR, opsite)) for
             (opname, opsite) in zip(factors(l), domain(l))
@@ -138,6 +151,8 @@ function measure_localops!(cb::ExpValueCallback, psiL::MPS, psiR::MPS, alg::TDVP
         # measurements(cb)[localop][end] is the last line in the measurements of localop,
         # which we (must) have created in apply! before calling this function.
     end
+
+    measurements_norm(cb)[end] = dot(psiL, psiR)
 
     return nothing
 end
@@ -153,16 +168,8 @@ function measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)
     # measured) anyway with vec(I), we don't need to care about the orthocenter, we just
     # measure everything at the end of the sweep.
 
-    # Contract each tensor from `ψ` with the identity, separately.
-    no_id_sites = intersect([domain(l) for l in ops(cb)]...)
-    # (We don't need the identity on those sites.)
-
-    ids = [
-        n in no_id_sites ? OneITensor() : state("vId", siteind(ψ, n)) * ψ[n] for
-        n in eachindex(ψ)
-    ]
-    # Where the identity is not needed, we put a OneITensor as a placeholder, so that the
-    # site enumeration is preserved.
+    # We contract each tensor from `ψ` with the identity, separately.
+    ids = [state("vId", siteind(ψ, n)) * ψ[n] for n in eachindex(ψ)]
 
     for l in ops(cb)
         # Compute the expectation values by multiplying the tensor of the LocalOperator and
@@ -190,6 +197,9 @@ function measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)
         # which we (must) have created in `apply!` before calling this function.
     end
 
+    # Now measure the trace, too.
+    measurements_norm(cb)[end] = scalar(prod(ids))
+
     return nothing
 end
 
@@ -201,6 +211,7 @@ function apply!(
         # Initialize `cb` here.
         push!(measurement_ts(cb), t)
         foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
+        push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
     else
         prev_t = measurement_ts(cb)[end]
     end
@@ -215,6 +226,9 @@ function apply!(
             push!(measurement_ts(cb), t)
             # Create a new slot in which we will put the measurement result.
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
+            if site == 1
+                push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+            end
         end
         measure_localops!(cb, state, site, alg)
     end
@@ -248,6 +262,7 @@ function apply!(
             push!(measurement_ts(cb), t)
             # Create a new slot in which we will put the measurement result.
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
+            push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
         end
         measure_localops!(cb, state1, state2, alg)
     end
@@ -271,6 +286,7 @@ function apply!(cb::ExpValueCallback, state::MPS, alg::TDVP1vec; t, sweepend, kw
             push!(measurement_ts(cb), t)
             # Create a new slot in which we will put the measurement result.
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
+            push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
         end
         measure_localops!(cb, state, alg)
     end

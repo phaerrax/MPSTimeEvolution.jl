@@ -1,6 +1,6 @@
 using MPSTimeEvolution
 using Test
-using ITensors, ITensorMPS, LindbladVectorizedTensors, Observers
+using ITensors, ITensorMPS, LindbladVectorizedTensors, Observers, CSV
 
 include("compare_tdvp_methods.jl")
 # This tests pushes the bond dimension to the maximum admitted by the sizes of the system,
