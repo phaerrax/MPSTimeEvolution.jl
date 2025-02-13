@@ -1,12 +1,13 @@
 jws(n1, n2) = (i => "F" for i in (n1 + 1):(n2 - 1))  # Jordan-Wigner string
 
-function itensors_tdvp(; dt, tmax, N, check_sites, init)
+function itensors_tdvp(; dt, tmax, freqs, couplings, check_sites, init)
+    N = length(freqs)
     sites = siteinds("Fermion", N)
 
     state_0 = MPS(sites, init)
     maxbonddim = maximum(maxlinkdims(state_0))
     state_0 = enlargelinks(state_0, maxbonddim; ref_state=init)
-    h = spin_chain([0.5; fill(0.25, N)], fill(1, N), sites)
+    h = spin_chain(freqs, couplings, sites)
     H = MPO(h, sites)
 
     site_pairs = [
@@ -77,14 +78,15 @@ end
 # on the correctness of the TDVP functions, mostly from a syntactic point of view. It
 # doesn't have to be a physically interesting, or correct, system.
 
-function siam_tdvp1(; dt, tmax, N, check_sites, init)
+function siam_tdvp1(; dt, tmax, freqs, couplings, check_sites, init)
+    N = length(freqs)
     sites = siteinds("Fermion", N)
 
     state_0 = MPS(sites, init)
     maxbonddim = maximum(maxlinkdims(state_0))
     state_0 = enlargelinks(state_0, maxbonddim; ref_state=init)
 
-    h = spin_chain([0.5; fill(0.25, N)], fill(1, N), sites)
+    h = spin_chain(freqs, couplings, sites)
     H = MPO(h, sites)
 
     site_pairs = [
@@ -125,14 +127,15 @@ function siam_tdvp1(; dt, tmax, N, check_sites, init)
     return f["time"], results...
 end
 
-function siam_tdvp1_with_qns(; dt, tmax, N, check_sites, init)
+function siam_tdvp1_with_qns(; dt, tmax, freqs, couplings, check_sites, init)
+    N = length(freqs)
     sites = siteinds("Fermion", N; conserve_nfparity=true)
 
     state_0 = MPS(sites, init)
     maxbonddim = maximum(maxlinkdims(state_0))
     state_0 = enlargelinks(state_0, maxbonddim; ref_state=init)
 
-    h = spin_chain([0.5; fill(0.25, N)], fill(1, N), sites)
+    h = spin_chain(freqs, couplings, sites)
     H = MPO(h, sites)
 
     site_pairs = [
@@ -173,14 +176,15 @@ function siam_tdvp1_with_qns(; dt, tmax, N, check_sites, init)
     return f["time"], results...
 end
 
-function siam_tdvp1vec(; dt, tmax, N, check_sites, init)
+function siam_tdvp1vec(; dt, tmax, freqs, couplings, check_sites, init)
+    N = length(freqs)
     sites = siteinds("vFermion", N)
 
     state_0 = MPS(sites, init)
     maxbonddim = maximum(maxlinkdims(state_0))
     state_0 = enlargelinks(state_0, maxbonddim; ref_state=init)
 
-    ℓ = spin_chain([0.5; fill(0.25, N)], fill(1, N), sites)
+    ℓ = spin_chain(freqs, couplings, sites)
     L = MPO(ℓ, sites)
 
     site_pairs = [
@@ -221,7 +225,8 @@ function siam_tdvp1vec(; dt, tmax, N, check_sites, init)
     return f["time"], results...
 end
 
-function siam_tdvp1vec_superfermions(; dt, tmax, N, check_sites, init)
+function siam_tdvp1vec_superfermions(; dt, tmax, freqs, couplings, check_sites, init)
+    N = length(freqs)
     sf_index(n) = 2n - 1
     inv_sf_index(n) = div(n + 1, 2)
     # (2n-1)-th site with superfermions == n-th site with traditional fermions
@@ -236,8 +241,8 @@ function siam_tdvp1vec_superfermions(; dt, tmax, N, check_sites, init)
     state_0 = enlargelinks(state_0, maxbonddim; ref_state=init ∘ inv_sf_index)
 
     ℓ =
-        spin_chain([0.5; fill(0.25, N)], fill(1, N), sites[1:2:end]) -
-        spin_chain([0.5; fill(0.25, N)], fill(1, N), sites[2:2:end])
+        spin_chain(freqs, couplings, sites[1:2:end]) -
+        spin_chain(freqs, couplings, sites[2:2:end])
     L = MPO(-im * ℓ, sites)
 
     sf_check_sites = sf_index.(check_sites)
@@ -283,12 +288,13 @@ function siam_tdvp1vec_superfermions(; dt, tmax, N, check_sites, init)
     return f["time"], results...
 end
 
-function siam_adjtdvp1vec(; dt, tmax, N, check_sites, init)
+function siam_adjtdvp1vec(; dt, tmax, freqs, couplings, check_sites, init)
+    N = length(freqs)
     sites = siteinds("vFermion", N)
 
     state_0 = MPS(sites, init)
 
-    adjℓ = spin_chain′([0.5; fill(0.25, N)], fill(1, N), sites)
+    adjℓ = spin_chain′(freqs, couplings, sites)
     adjL = MPO(adjℓ, sites)
 
     site_pairs = [
