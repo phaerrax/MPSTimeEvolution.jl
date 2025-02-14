@@ -3,10 +3,9 @@ using Test
 using ITensors, ITensorMPS, LindbladVectorizedTensors, Observers, CSV
 
 include("compare_tdvp_methods.jl")
-# This tests pushes the bond dimension to the maximum admitted by the sizes of the system,
-# so it's best to keep N relatively low so that the computation doesn't get too heavy.
-atol = 1e-8
-@testset "Compare different TDVP methods at atol=$atol" begin
+@testset verbose = true "TDVP1 methods" begin
+    # These tests push the bond dimension to the maximum admitted by the sizes of the system,
+    # so it's best to keep N relatively low so that the computation doesn't get too heavy.
     dt = 0.01
     tmax = 0.5
     N = 6
@@ -14,17 +13,6 @@ atol = 1e-8
     couplings = fill(1 / 16, N - 1)
     alternate(n) = isodd(n) ? "Occ" : "Emp"
     sites = [1, 3]
-    # It's best to choose sites that start from an occupied state, to avoid slight numerical
-    # instabilities that could make `isapprox` fail.
-
-    reference_result = itensors_tdvp(;  # Reference result from ITensor's in-house TDVP.
-        dt=dt,
-        tmax=tmax,
-        freqs=freqs,
-        couplings=couplings,
-        check_sites=sites,
-        init=alternate,
-    )
 
     res_tdvp1 = siam_tdvp1(;
         dt=dt,
@@ -34,61 +22,72 @@ atol = 1e-8
         check_sites=sites,
         init=alternate,
     )
-    @test all(
-        all(isapprox.(r1, r2; atol=atol)) for (r1, r2) in zip(reference_result, res_tdvp1)
-    )
 
-    res_tdvp1_with_qns = siam_tdvp1_with_qns(;
-        dt=dt,
-        tmax=tmax,
-        freqs=freqs,
-        couplings=couplings,
-        check_sites=sites,
-        init=alternate,
-    )
-    @test_skip all(
-        all(isapprox.(r1, r2; atol=atol)) for
-        (r1, r2) in zip(reference_result, res_tdvp1_with_qns)
-    )
+    atol = 1e-8
+    @testset "tdvp1! method against ITensor's TDVP1 (w/ atol=$atol)" begin
+        itensors_result = itensors_tdvp(;  # Result from ITensor's in-house TDVP.
+            dt=dt,
+            tmax=tmax,
+            freqs=freqs,
+            couplings=couplings,
+            check_sites=sites,
+            init=alternate,
+        )
 
-    res_tdvp1vec_sf = siam_tdvp1vec_superfermions(;
-        dt=dt,
-        tmax=tmax,
-        freqs=freqs,
-        couplings=couplings,
-        check_sites=sites,
-        init=alternate,
-    )
-    @test all(
-        all(isapprox.(r1, r2; atol=atol)) for
-        (r1, r2) in zip(reference_result, res_tdvp1vec_sf)
-    )
+        # A vanilla `isapprox` test with ours and ITensor's TDVP functions usually fails, as it
+        # imposes a too stringent condition. The two functions do give 𝑎𝑝𝑝𝑟𝑜𝑥𝑖𝑚𝑎𝑡𝑒𝑙𝑦 equal
+        # results but not with the default rtol/atol set in `isapprox`.
+        @test all(
+            all(isapprox.(r1, r2; atol=atol)) for
+            (r1, r2) in zip(itensors_result, res_tdvp1)
+        )
+    end
 
-    res_tdvp1vec = siam_tdvp1vec(;
-        dt=dt,
-        tmax=tmax,
-        freqs=freqs,
-        couplings=couplings,
-        check_sites=sites,
-        init=alternate,
-    )
-    @test all(
-        all(isapprox.(r1, r2; atol=atol)) for
-        (r1, r2) in zip(reference_result, res_tdvp1vec)
-    )
+    @testset "Compare different TDVP methods" begin
+        # It's best to choose sites that start from an occupied state, to avoid slight numerical
+        # instabilities that could make `isapprox` fail.
+        res_tdvp1_with_qns = siam_tdvp1_with_qns(;
+            dt=dt,
+            tmax=tmax,
+            freqs=freqs,
+            couplings=couplings,
+            check_sites=sites,
+            init=alternate,
+        )
+        @test_skip all(
+            all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_tdvp1_with_qns)
+        )
 
-    res_adjtdvp1vec = siam_adjtdvp1vec(;
-        dt=dt,
-        tmax=tmax,
-        freqs=freqs,
-        couplings=couplings,
-        check_sites=sites,
-        init=alternate,
-    )
-    @test all(
-        all(isapprox.(r1, r2; atol=atol)) for
-        (r1, r2) in zip(reference_result, res_adjtdvp1vec)
-    )
+        res_tdvp1vec_sf = siam_tdvp1vec_superfermions(;
+            dt=dt,
+            tmax=tmax,
+            freqs=freqs,
+            couplings=couplings,
+            check_sites=sites,
+            init=alternate,
+        )
+        @test all(all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_tdvp1vec_sf))
+
+        res_tdvp1vec = siam_tdvp1vec(;
+            dt=dt,
+            tmax=tmax,
+            freqs=freqs,
+            couplings=couplings,
+            check_sites=sites,
+            init=alternate,
+        )
+        @test all(all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_tdvp1vec))
+
+        res_adjtdvp1vec = siam_adjtdvp1vec(;
+            dt=dt,
+            tmax=tmax,
+            freqs=freqs,
+            couplings=couplings,
+            check_sites=sites,
+            init=alternate,
+        )
+        @test all(all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_adjtdvp1vec))
+    end
 end
 
 include("joint_tdvp.jl")
