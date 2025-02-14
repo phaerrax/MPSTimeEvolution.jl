@@ -2,6 +2,15 @@ using MPSTimeEvolution
 using Test
 using ITensors, ITensorMPS, LindbladVectorizedTensors, Observers, CSV
 
+include("norm_preservation.jl")
+@testset "Norm/trace preservation" begin
+    dt = 0.01
+    tmax = 0.5
+    N = 5
+    @test tdvp1_preserves_norm(; dt=dt, tmax=tmax, N=N)
+    @test tdvp1vec_preserves_trace(; dt=dt, tmax=tmax, N=N)
+end
+
 include("compare_tdvp_methods.jl")
 @testset verbose = true "TDVP1 methods" begin
     # These tests push the bond dimension to the maximum admitted by the sizes of the system,
