@@ -25,13 +25,21 @@ connecteddomain(op::LocalOperator) = first(domain(op)):last(domain(op))
 # `connecteddomain` are guaranteed to return sorted lists of numbers.
 name(op::LocalOperator) = *(["$val{$key}" for (key, val) in op.terms]...)
 
+# Sorting utilities
+Base.:(==)(a::LocalOperator, b::LocalOperator) = (a.terms == b.terms)
+Base.hash(a::LocalOperator) = hash(a.terms)
+function Base.isless(a::LocalOperator, b::LocalOperator)
+    # Compare domains first (lexicographycally)
+    return if !isequal(domain(a), domain(b))
+        isless(domain(a), domain(b))
+    else  # the names of the factors
+        collect(factors(a)) < collect(factors(b))
+    end
+end
+
 Base.getindex(op::LocalOperator, key) = Base.getindex(op.terms, key)
 
 Base.show(io::IO, op::LocalOperator) = print(io, name(op))
-
-function Base.isless(A::LocalOperator, B::LocalOperator)
-    return Base.isless(name(A), name(B))
-end
 
 """
     mpo(sites::Vector{<:Index}, l::LocalOperator)
