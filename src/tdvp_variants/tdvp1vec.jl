@@ -106,7 +106,7 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
     for s in 1:nsteps
         # In TDVP1 only one site at a time is modified, so we iterate on the sites
         # of the state's MPS, not the bonds.
-        stime = @elapsed for (site, ha) in sweepnext(N; ncenter=1)
+        time_evol = @elapsed for (site, ha) in sweepnext(N; ncenter=1)
             # sweepnext(N) is an iterable object that evaluates to tuples of the form
             # (bond, ha) where bond is the bond number and ha is the half-sweep number.
             # The kwarg ncenter determines the end and turning points of the loop: if
@@ -132,13 +132,14 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
-        mtime = @elapsed apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+        time_meas = @elapsed apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
 
-        @debug "Time spent on time-evolution step: $stime s" *
-            "\nTime spent on computing expectation values: $mtime s"
+        @debug "Time spent on time-evolution step: $time_evol s" *
+            "\nTime spent on computing expectation values: $time_meas s"
 
-        !isnothing(pbar) &&
-            ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
+        !isnothing(pbar) && ProgressMeter.next!(
+            pbar; showvalues=simulationinfo(state, current_time, time_evol + time_meas)
+        )
 
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0
@@ -149,7 +150,7 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
                 printoutput_data(io_handle, cb, state; vectorized=true, kwargs...)
             end
             printoutput_ranks(ranks_handle, cb, state)
-            printoutput_stime(times_handle, stime)
+            printoutput_stime(times_handle, time_evol + time_meas)
         end
 
         checkdone!(cb) && break
@@ -245,7 +246,7 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwa
         @debug "[Step $s] Attempting to grow the bond dimensions."
         adaptbonddimensions!(state, PH, max_bond, convergence_factor_bonddims)
 
-        stime = @elapsed for (site, ha) in sweepnext(N; ncenter=1)
+        time_evol = @elapsed for (site, ha) in sweepnext(N; ncenter=1)
             # sweepnext(N) is an iterable object that evaluates to tuples of the form
             # (bond, ha) where bond is the bond number and ha is the half-sweep number.
             # The kwarg ncenter determines the end and turning points of the loop: if
@@ -271,13 +272,14 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwa
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
-        mtime = @elapsed apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+        time_meas = @elapsed apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
 
-        @debug "Time spent on time-evolution step: $stime s" *
-            "\nTime spent on computing expectation values: $mtime s"
+        @debug "Time spent on time-evolution step: $time_evol s" *
+            "\nTime spent on computing expectation values: $time_meas s"
 
-        !isnothing(pbar) &&
-            ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
+        !isnothing(pbar) && ProgressMeter.next!(
+            pbar; showvalues=simulationinfo(state, current_time, time_evol + time_meas)
+        )
 
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0
@@ -288,7 +290,7 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwa
                 printoutput_data(io_handle, cb, state; vectorized=true, kwargs...)
             end
             printoutput_ranks(ranks_handle, cb, state)
-            printoutput_stime(times_handle, stime)
+            printoutput_stime(times_handle, time_evol + time_meas)
         end
 
         checkdone!(cb) && break
