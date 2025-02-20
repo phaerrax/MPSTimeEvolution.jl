@@ -181,13 +181,10 @@ end
 
 function printoutput_ranks(ranks_handle, cb, states::MPS...)
     if !isnothing(ranks_handle)
-        data = [measurement_ts(cb)[end]]
+        current_time = measurement_ts(cb)[end]
+        bonddims = reduce(vcat, ITensorMPS.linkdims(state) for state in states)
 
-        for state in states
-            push!(data, ITensorMPS.linkdims(state)...)
-        end
-
-        println(ranks_handle, join(data, ","))
+        println(ranks_handle, current_time, ",", join(bonddims, ","))
         flush(ranks_handle)
     end
 
