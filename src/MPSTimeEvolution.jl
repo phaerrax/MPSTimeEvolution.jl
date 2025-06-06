@@ -12,12 +12,17 @@ using JSON
 using DelimitedFiles
 using Permutations
 
+abstract type TDVP end
+struct TDVP1 <: TDVP end
+struct TDVP1vec <: TDVP end
+struct TDVP2 <: TDVP end
+
 include("itensor.jl")
 include("callback.jl")
-include("utils.jl")
 include("localoperator.jl")
 include("expvalue_callback.jl")
 include("superfermion_callback.jl")
+include("utils.jl")
 
 #include("tebd.jl")
 
