@@ -227,29 +227,23 @@ end
 
 function siam_tdvp1vec_superfermions(; dt, tmax, freqs, couplings, check_sites, init)
     N = length(freqs)
-    sf_index(n) = 2n - 1
-    inv_sf_index(n) = div(n + 1, 2)
-    # (2n-1)-th site with superfermions == n-th site with traditional fermions
-    # `inv_sf_index` is the left-inverse of `sf_index`:
-    #   sf_index.(inv_sf_index.(1:10)) == [1, 1, 3, 3, 5, 5, 7, 7, 9, 9]
-    #   inv_sf_index.(sf_index.(1:10)) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     sites = siteinds("Fermion", 2N; conserve_nfparity=true)
 
-    state_0 = MPS(sites, init ∘ inv_sf_index)
+    state_0 = MPS(sites, init ∘ _sf_translate_sites_inv)
     maxbonddim = maximum(maxlinkdims(state_0))
-    state_0 = enlargelinks(state_0, maxbonddim; ref_state=init ∘ inv_sf_index)
+    state_0 = enlargelinks(state_0, maxbonddim; ref_state=init)
 
     ℓ =
         spin_chain(freqs, couplings, sites[1:2:end]) -
         spin_chain(freqs, couplings, sites[2:2:end])
     L = MPO(-im * ℓ, sites)
 
-    sf_check_sites = sf_index.(check_sites)
+    sf_check_sites = _sf_translate_sites.(check_sites)
     site_pairs = [
         (check_sites[j], check_sites[i]) for i in eachindex(check_sites) for j in 1:(i - 1)
     ]
-    sf_site_pairs = [sf_index.(p) for p in site_pairs]
+    sf_site_pairs = [_sf_translate_sites.(p) for p in site_pairs]
     operators = [
         # We don't need to use the adjoints here because SuperfermionCallback is coded
         # properly: it does the adjunction by itself already.

@@ -70,20 +70,22 @@ function expval_vec_sf(; N=10)
     MPSTimeEvolution.apply!(cb, x, MPSTimeEvolution.TDVP1vec(); t=0, sweepend=true)
     ev_trad = [MPSTimeEvolution.measurements(cb)[l][end] for l in MPSTimeEvolution.ops(cb)]
 
-    # Superfermion vectorisation
-    sf_index(n) = 2n - 1
     # Check the correct behaviour of the `measure_localops!(cb, ψ, alg::TDVP1vec)` method.
     s = siteinds("Fermion", 2N; conserve_nfparity=true)
-    x = MPS(s, n -> isodd(div(n + 1, 2)) ? "Occ" : "Emp")
+    x = MPS(s, n -> isodd(_sf_translate_sites_inv(n)) ? "Occ" : "Emp")
 
     operators = [
-        LocalOperator(sf_index(1) => "N"),
-        LocalOperator(sf_index(3) => "N"),
+        LocalOperator(_sf_translate_sites(1) => "N"),
+        LocalOperator(_sf_translate_sites(3) => "N"),
         LocalOperator((
-            sf_index(1) => "Adag", jws(sf_index(1), sf_index(8))..., sf_index(8) => "A"
+            _sf_translate_sites(1) => "Adag",
+            jws(_sf_translate_sites(1), _sf_translate_sites(8))...,
+            _sf_translate_sites(8) => "A",
         )),
         LocalOperator((
-            sf_index(4) => "A", jws(sf_index(4), sf_index(6))..., sf_index(6) => "Adag"
+            _sf_translate_sites(4) => "A",
+            jws(_sf_translate_sites(4), _sf_translate_sites(6))...,
+            _sf_translate_sites(6) => "Adag",
         )),
     ]
     cb = SuperfermionCallback(operators, s, 0.1)

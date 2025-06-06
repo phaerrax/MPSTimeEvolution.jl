@@ -2,6 +2,8 @@ using MPSTimeEvolution
 using Test
 using ITensors, ITensorMPS, LindbladVectorizedTensors, Observers, CSV
 
+using MPSTimeEvolution: _sf_translate_sites, _sf_translate_sites_inv
+
 include("norm_preservation.jl")
 @testset "Norm/trace preservation" begin
     dt = 0.01

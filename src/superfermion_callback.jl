@@ -9,6 +9,15 @@ struct SuperfermionCallback <: TEvoCallback
     measure_timestep::Float64
 end
 
+_sf_translate_sites(n::Int) = 2n-1
+_sf_translate_sites_inv(n::Int) = div(n+1, 2)
+function _sf_translate_sites(op::LocalOperator)
+    LocalOperator(Dict(_sf_translate_sites(k) => v for (k, v) in op.terms))
+end
+function _sf_translate_sites_inv(op::LocalOperator)
+    LocalOperator(Dict(_sf_translate_sites_inv(k) => v for (k, v) in op.terms))
+end
+
 """
     SuperfermionCallback(
         operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
@@ -116,7 +125,8 @@ function measure_localops!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec)
     # Contract each tensor from `ψ` with the identity, separately.
     sf_id_blocks = _sf_id_pairs(ψ)
     ids = [
-        dag(sf_id_blocks[div(n + 1, 2)]) * ψ[n] * ψ[n + 1] for n in eachindex(ψ)[1:2:end]
+        dag(sf_id_blocks[_sf_translate_sites_inv(n)]) * ψ[n] * ψ[n + 1] for
+        n in eachindex(ψ)[1:2:end]
     ]
     # Where the identity is not needed, we put a OneITensor as a placeholder, so that the
     # site enumeration is preserved.
@@ -134,9 +144,12 @@ function measure_localops!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec)
                 else
                     op(l[n], siteind(ψ, n))
                 end
-                x *= dag(apply(adj(lop), sf_id_blocks[div(n + 1, 2)])) * ψ[n] * ψ[n + 1]
+                x *=
+                    dag(apply(adj(lop), sf_id_blocks[_sf_translate_sites_inv(n)])) *
+                    ψ[n] *
+                    ψ[n + 1]
             else
-                x *= ids[div(n + 1, 2)]
+                x *= ids[_sf_translate_sites_inv(n)]
             end
         end
         measurements(cb)[l][end] = scalar(x)
