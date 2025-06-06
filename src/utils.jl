@@ -22,6 +22,28 @@ function meanordefault(v, default=nothing)
     end
 end
 
+function writeheaders_data(io_file, cb::SuperfermionCallback; kwargs...)
+    io_handle = nothing
+    if !isnothing(io_file)
+        io_handle = open(io_file, "w")
+
+        columnheaders = ["time"]
+        for o in _sf_translate_sites_inv.(sort(ops(cb)))
+            push!(columnheaders, name(o) * "_re", name(o) * "_im")
+        end
+
+        if get(kwargs, :store_psi0, false)
+            push!(columnheaders, "overlap_re", "overlap_im")
+        end
+
+        push!(columnheaders, "Norm_re", "Norm_im")
+
+        println(io_handle, join(columnheaders, ","))
+    end
+
+    return io_handle
+end
+
 """
     writeheaders_data(io_file, cb; kwargs...)
 
