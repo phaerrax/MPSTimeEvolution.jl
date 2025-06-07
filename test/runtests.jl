@@ -5,12 +5,19 @@ using ITensors, ITensorMPS, LindbladVectorizedTensors, Observers, CSV
 using MPSTimeEvolution: _sf_translate_sites, _sf_translate_sites_inv
 
 include("norm_preservation.jl")
-@testset "Norm/trace preservation" begin
+@testset verbose=true "Norm/trace preservation" begin
     dt = 0.01
     tmax = 0.5
     N = 5
-    @test tdvp1_preserves_norm(; dt=dt, tmax=tmax, N=N)
-    @test tdvp1vec_preserves_trace(; dt=dt, tmax=tmax, N=N)
+    @testset "Standard TDVP1" begin
+        @test tdvp1_preserves_norm(; dt=dt, tmax=tmax, N=N)
+    end
+    @testset "Vectorised TDVP1" begin
+        @test tdvp1vec_preserves_trace(; dt=dt, tmax=tmax, N=N)
+    end
+    @testset "Adaptive TDVP1" begin
+        @test adaptivetdvp1_preserves_trace(; dt=dt, tmax=tmax, N=N)
+    end
 end
 
 include("compare_tdvp_methods.jl")
@@ -35,7 +42,7 @@ include("compare_tdvp_methods.jl")
     )
 
     atol = 1e-8
-    @testset "tdvp1! method against ITensor's TDVP1 (w/ atol=$atol)" begin
+    @testset "tdvp1! method against ITensor's TDVP1 (atol=$atol)" begin
         itensors_result = itensors_tdvp(;  # Result from ITensor's in-house TDVP.
             dt=dt,
             tmax=tmax,
@@ -54,50 +61,78 @@ include("compare_tdvp_methods.jl")
         )
     end
 
-    @testset "Compare different TDVP methods" begin
+    @testset verbose=true "Compare different TDVP methods" begin
         # It's best to choose sites that start from an occupied state, to avoid slight numerical
         # instabilities that could make `isapprox` fail.
-        res_tdvp1_with_qns = siam_tdvp1_with_qns(;
-            dt=dt,
-            tmax=tmax,
-            freqs=freqs,
-            couplings=couplings,
-            check_sites=sites,
-            init=alternate,
-        )
-        @test_skip all(
-            all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_tdvp1_with_qns)
-        )
+        @testset "TDVP1 with quantum numbers" begin
+            res_tdvp1_with_qns = siam_tdvp1_with_qns(;
+                dt=dt,
+                tmax=tmax,
+                freqs=freqs,
+                couplings=couplings,
+                check_sites=sites,
+                init=alternate,
+            )
+            @test_skip all(
+                all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_tdvp1_with_qns)
+            )
+        end
 
-        res_tdvp1vec_sf = siam_tdvp1vec_superfermions(;
-            dt=dt,
-            tmax=tmax,
-            freqs=freqs,
-            couplings=couplings,
-            check_sites=sites,
-            init=alternate,
-        )
-        @test all(all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_tdvp1vec_sf))
+        @testset "TDVP1 with superfermion states" begin
+            res_tdvp1vec_sf = siam_tdvp1vec_superfermions(;
+                dt=dt,
+                tmax=tmax,
+                freqs=freqs,
+                couplings=couplings,
+                check_sites=sites,
+                init=alternate,
+            )
+            @test all(
+                all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_tdvp1vec_sf)
+            )
+        end
 
-        res_tdvp1vec = siam_tdvp1vec(;
-            dt=dt,
-            tmax=tmax,
-            freqs=freqs,
-            couplings=couplings,
-            check_sites=sites,
-            init=alternate,
-        )
-        @test all(all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_tdvp1vec))
+        @testset "Vectorized TDVP1" begin
+            res_tdvp1vec = siam_tdvp1vec(;
+                dt=dt,
+                tmax=tmax,
+                freqs=freqs,
+                couplings=couplings,
+                check_sites=sites,
+                init=alternate,
+            )
+            @test all(all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_tdvp1vec))
+        end
 
-        res_adjtdvp1vec = siam_adjtdvp1vec(;
-            dt=dt,
-            tmax=tmax,
-            freqs=freqs,
-            couplings=couplings,
-            check_sites=sites,
-            init=alternate,
-        )
-        @test all(all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_adjtdvp1vec))
+        @testset "Adjoint vectorized TDVP1" begin
+            res_adjtdvp1vec = siam_adjtdvp1vec(;
+                dt=dt,
+                tmax=tmax,
+                freqs=freqs,
+                couplings=couplings,
+                check_sites=sites,
+                init=alternate,
+            )
+            @test all(
+                all(isapprox.(r1, r2)) for (r1, r2) in zip(res_tdvp1, res_adjtdvp1vec)
+            )
+        end
+
+        adaptive_tdvp1_atol=1e-6
+        @testset "Adaptive TDVP1 (atol=$adaptive_tdvp1_atol)" begin
+            res_adaptivetdvp1 = siam_adaptivetdvp1(;
+                dt=dt,
+                tmax=tmax,
+                freqs=freqs,
+                couplings=couplings,
+                check_sites=sites,
+                init=alternate,
+            )
+            @test all(
+                all(isapprox.(r1, r2; atol=adaptive_tdvp1_atol)) for
+                (r1, r2) in zip(res_tdvp1, res_adaptivetdvp1)
+            )
+        end
     end
 end
 

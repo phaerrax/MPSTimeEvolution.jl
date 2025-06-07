@@ -65,3 +65,32 @@ function tdvp1vec_preserves_trace(; dt, tmax, N)
     f = CSV.File(tmpfile)
     return allapproxequal(complex.(f["Norm_re"], f["Norm_im"]))
 end
+
+function adaptivetdvp1_preserves_trace(; dt, tmax, N)
+    sites = siteinds("Fermion", N)
+
+    state_0 = random_mps(sites)
+
+    h = spin_chain([0.2; fill(0.1, N - 1)], fill(0.3, N - 1), sites)
+    H = MPO(h, sites)
+
+    cb = ExpValueCallback(LocalOperator[], sites, dt)
+
+    tmpfile = tempname()
+
+    adaptivetdvp1!(
+        state_0,
+        H,
+        dt,
+        tmax;
+        callback=cb,
+        progress=false,
+        io_file=tmpfile,
+        io_ranks="/dev/null",
+        io_times="/dev/null",
+        convergence_factor_bonddims=1e-12,
+    )
+
+    f = CSV.File(tmpfile)
+    return allapproxequal(complex.(f["Norm_re"], f["Norm_im"]))
+end
