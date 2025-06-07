@@ -39,7 +39,7 @@ function SuperfermionCallback(
     return SuperfermionCallback(
         operators,
         sites,
-        Dict(_sf_translate_sites(o) => ExpValueSeries() for o in operators),
+        Dict(o => ExpValueSeries() for o in operators),
         ExpValueSeries(),
         # A single ExpValueSeries for each operator in the list.
         Vector{Float64}(),

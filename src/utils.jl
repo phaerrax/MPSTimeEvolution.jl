@@ -23,7 +23,7 @@ function writeheaders_data(io_file, cb::SuperfermionCallback; kwargs...)
         io_handle = open(io_file, "w")
 
         columnheaders = ["time"]
-        for o in _sf_translate_sites_inv.(sort(ops(cb)))
+        for o in sort(ops(cb))
             push!(columnheaders, name(o) * "_re", name(o) * "_im")
         end
 
