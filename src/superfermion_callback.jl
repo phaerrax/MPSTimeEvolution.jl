@@ -69,33 +69,6 @@ end
 
 checkdone!(cb::SuperfermionCallback, args...) = false
 
-@memoize function identity_sf(sites)
-    N = length(sites)
-    @assert iseven(N)
-    pairs = [
-        add(MPS(sites[n:(n + 1)], "Emp"), MPS(sites[n:(n + 1)], "Occ"); alg="directsum") for
-        n in 1:2:N if n + 1 ≤ N
-    ]
-    # Use the "direct sum" method for summing the MPSs so that ITensors doesn't waste time
-    # re-orthogonalizing the result, which might also reverse the direction of some QN
-    # arrows, and we don't want that.
-
-    id = MPS(
-        collect(Iterators.flatten((pairs[n][1], pairs[n][2]) for n in eachindex(pairs)))
-    )
-
-    vacuum = MPS(sites, "Emp")  # copy link indices from here
-    # Here "Up" or "Dn" makes no difference, because we are interested only in the link
-    # indices between sites 2j and 2j+1, and an even number of "Up" or "Dn" states doesn't
-    # change the parity.
-
-    for n in 2:2:(N - 1)
-        id[n] *= state(linkind(vacuum, n), 1)
-        id[n + 1] *= state(dag(linkind(vacuum, n)), 1)
-    end
-    return id
-end
-
 """
     adj(x)
 
@@ -104,11 +77,11 @@ Note that it is not the same as ITensors.adjoint.
 """
 adj(x) = swapprime(dag(x), 0 => 1)
 
-@memoize function _sf_id_pairs(ψ)
+@memoize function _sf_id_pairs(sites)
     return [
-        state(siteind(ψ, n), "Emp") * state(siteind(ψ, n + 1), "Emp") +
-        state(siteind(ψ, n), "Occ") * state(siteind(ψ, n + 1), "Occ") for
-        n in eachindex(ψ)[1:2:end]
+        state(sites[n], "Emp") * state(sites[n + 1], "Occ") +
+        state(sites[n], "Occ") * state(sites[n + 1], "Emp") for
+        n in eachindex(sites)[1:2:end]
     ]
 end
 
@@ -123,7 +96,7 @@ function measure_localops!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec)
     # 2-site blocks at a time.
 
     # Contract each tensor from `ψ` with the identity, separately.
-    sf_id_blocks = _sf_id_pairs(ψ)
+    sf_id_blocks = _sf_id_pairs(siteinds(ψ))
     ids = [
         dag(sf_id_blocks[_sf_translate_sites_inv(n)]) * ψ[n] * ψ[n + 1] for
         n in eachindex(ψ)[1:2:end]

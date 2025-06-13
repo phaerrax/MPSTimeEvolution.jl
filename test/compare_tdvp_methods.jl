@@ -225,19 +225,57 @@ function siam_tdvp1vec(; dt, tmax, freqs, couplings, check_sites, init)
     return f["time"], results...
 end
 
+function invert_ancillary_states(states)
+    if any(s -> s != "Occ" && s != "Emp", states)
+        error("initial states must be either \"Occ\" or \"Emp\".")
+    end
+
+    @assert iseven(length(states))
+    N = div(length(states), 2)
+
+    # Invert initial state of ancillary sites
+    for i in 2:2:2N
+        if states[i] == "Occ"
+            states[i] = "Emp"
+        else  # states[i] == "Emp"
+            states[i] = "Occ"
+        end
+    end
+    return states
+end
+
 function siam_tdvp1vec_superfermions(; dt, tmax, freqs, couplings, check_sites, init)
     N = length(freqs)
 
     sites = siteinds("Fermion", 2N; conserve_nfparity=true)
 
-    state_0 = MPS(sites, init ∘ _sf_translate_sites_inv)
+    init_states_str = invert_ancillary_states(init.(_sf_translate_sites_inv.(1:2N)))
+    state_0 = MPS(sites, init_states_str)
     maxbonddim = maximum(maxlinkdims(state_0))
     state_0 = enlargelinks(state_0, maxbonddim; ref_state=init)
 
-    ℓ =
-        spin_chain(freqs, couplings, sites[1:2:end]) -
-        spin_chain(freqs, couplings, sites[2:2:end])
-    L = MPO(-im * ℓ, sites)
+    ℓ = OpSum()
+    for j in 1:N
+        ℓ += -im*freqs[j], "c† * c", _sf_translate_sites(j)
+        ℓ += im*freqs[j], "c * c†", _sf_translate_sites(j)+1
+        if _sf_translate_sites(j+1) ≤ 2N
+            ℓ += -im*couplings[j],
+            "c†", _sf_translate_sites(j), "c",
+            _sf_translate_sites(j+1)
+            ℓ += -im*couplings[j],
+            "c†", _sf_translate_sites(j+1), "c",
+            _sf_translate_sites(j)
+        end
+        if _sf_translate_sites(j+1)+1 ≤ 2N
+            ℓ += im*couplings[j],
+            "c", _sf_translate_sites(j)+1, "c†",
+            _sf_translate_sites(j+1)+1
+            ℓ += im*couplings[j],
+            "c", _sf_translate_sites(j+1)+1, "c†",
+            _sf_translate_sites(j)+1
+        end
+    end
+    L = MPO(ℓ, sites)
 
     sf_check_sites = _sf_translate_sites.(check_sites)
     site_pairs = [
@@ -245,8 +283,6 @@ function siam_tdvp1vec_superfermions(; dt, tmax, freqs, couplings, check_sites, 
     ]
     sf_site_pairs = [_sf_translate_sites.(p) for p in site_pairs]
     operators = [
-        # We don't need to use the adjoints here because SuperfermionCallback is coded
-        # properly: it does the adjunction by itself already.
         [LocalOperator(n => "n") for n in sf_check_sites]
         [
             LocalOperator((n1 => "a", jws(n1, n2)..., n2 => "adag")) for

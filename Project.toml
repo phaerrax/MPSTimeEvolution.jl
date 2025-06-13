@@ -1,7 +1,7 @@
 name = "MPSTimeEvolution"
 uuid = "509c1b6a-26da-4538-875f-50b31a76b593"
 authors = ["orialb <orialb1@gmail.com>", "kindaguy <dario.tamascelli@unimi.it>", "Davide Ferracin <davide.ferracin@protonmail.com>"]
-version = "0.5.2"
+version = "0.6.0"
 
 [deps]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"

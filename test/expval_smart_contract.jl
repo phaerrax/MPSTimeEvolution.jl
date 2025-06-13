@@ -72,7 +72,9 @@ function expval_vec_sf(; N=10)
 
     # Check the correct behaviour of the `measure_localops!(cb, ψ, alg::TDVP1vec)` method.
     s = siteinds("Fermion", 2N; conserve_nfparity=true)
-    x = MPS(s, n -> isodd(_sf_translate_sites_inv(n)) ? "Occ" : "Emp")
+    init(n) = isodd(n) ? "Occ" : "Emp"
+    init_states_sf = invert_ancillary_states(init.(_sf_translate_sites_inv.(1:2N)))
+    x = MPS(s, init_states_sf)
 
     operators = [
         LocalOperator(_sf_translate_sites(1) => "N"),
