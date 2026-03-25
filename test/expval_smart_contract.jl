@@ -30,14 +30,14 @@ function expval_vec(; N=10)
     s = siteinds("vFermion", N)
     x = random_mps(s; linkdims=4)
 
-    operators = [
-        LocalOperator(1 => "N"),
-        LocalOperator(3 => "N"),
-        LocalOperator((1 => "Adag", 3 => "F", 8 => "A")),
-        LocalOperator((4 => "A", 6 => "Adag")),
-    ]
+    #operators = [
+    #    LocalOperator(1 => "N"),
+    #    LocalOperator(3 => "N"),
+    #    LocalOperator((1 => "Adag", 3 => "F", 8 => "A")),
+    #    LocalOperator((4 => "A", 6 => "Adag")),
+    #]
 
-    cb = ExpValueCallback(operators, s, 0.1)
+    cb = ExpValueCallback("N(1),N(3),Adag(1)F(3)A(8),A(4)Adag(6)", s, 0.1)
 
     MPSTimeEvolution.apply!(cb, x, MPSTimeEvolution.TDVP1vec(); t=0, sweepend=true)
     ev_cb = [MPSTimeEvolution.measurements(cb)[l][end] for l in MPSTimeEvolution.ops(cb)]

@@ -12,6 +12,13 @@ include("testset_skip.jl")
     @test parseoperators("a(1),b(4)") == [LocalOperator(1 => "a"), LocalOperator(4 => "b")]
     @test parseoperators("a(1)b(3)") == [LocalOperator(Dict(1 => "a", 3 => "b"))]
     @test_throws ArgumentError LocalOperator("a(1),b(3)")
+
+    N = 5
+    dt = 0.1
+    cb = ExpValueCallback("σx(1),σy(4)", siteinds("S=1/2", N), dt)
+    @test MPSTimeEvolution.ops(cb) == [LocalOperator(1 => "σx"), LocalOperator(4 => "σy")]
+    @test length(MPSTimeEvolution.sites(cb)) == 5
+    @test MPSTimeEvolution.callback_dt(cb) == dt
 end
 
 include("norm_preservation.jl")

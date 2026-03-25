@@ -14,8 +14,8 @@ function siam_tdvp1vec_single_mpo(; dt, tmax, N)
     ℓ = spin_chain(freqs, coups, sites)
     L = MPO(ℓ, sites)
 
-    operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
-    cb = ExpValueCallback(operators, sites, dt)
+    #operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
+    cb = ExpValueCallback("N(1,5)", sites, dt)
 
     tmpfile = tempname()
 
@@ -60,8 +60,8 @@ function siam_tdvp1vec_two_mpos(; dt, tmax, N)
     L1 = MPO(ℓ1, sites)
     L2 = MPO(ℓ2, sites)
 
-    operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
-    cb = ExpValueCallback(operators, sites, dt)
+    #operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
+    cb = ExpValueCallback("N(1,5)", sites, dt)
 
     tmpfile = tempname()
 

@@ -12,8 +12,8 @@ function siam_tdvp1_with_phase(; phase, dt, tmax, N)
     h = spin_chain([0.5; fill(0.25, N)], fill(1, N), sites)
     H = MPO(h, sites)
 
-    operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
-    cb = ExpValueCallback(operators, sites, dt)
+    #operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
+    cb = ExpValueCallback("N(1,5)", sites, dt)
 
     tmpfile = tempname()
 
@@ -50,8 +50,8 @@ function siam_jointtdvp1_with_phase(; phase, dt, tmax, N)
     h = spin_chain([0.5; fill(0.25, N)], fill(1, N), sites)
     H = MPO(h, sites)
 
-    operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
-    cb = ExpValueCallback(operators, sites, dt)
+    #operators = [LocalOperator(Dict(1 => "N")), LocalOperator(Dict(5 => "N"))]
+    cb = ExpValueCallback("N(1,5)", sites, dt)
 
     tmpfile = tempname()
 

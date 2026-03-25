@@ -15,18 +15,21 @@ end
 
 """
     ExpValueCallback(
-        operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
+        operators, sites::Vector{<:Index}, measure_timestep::Float64
     )
 
-Construct an `ExpValueCallback`, providing an array `operators` of `LocalOperator` objects
-representing operators associated to specific sites. Each of them will be measured
-on the given site during every step of the time evolution, and the results recorded inside
-the `ExpValueCallback` object as an `ExpValueSeries` for later analysis. The norm of the
-state, or the an equivalent quantity (trace, overlap of two sites...) where applicable, will
-also be computed after each step.
+Construct an `ExpValueCallback`, providing some `operators` and a list of ITensor `sites`. 
+The `operator` variable can be either a vector of `LocalOperator` objects, or a string (see
+`parseoperators` for instructions on the allowed syntax).  Each of operators will be
+measured on the associated sites during every step of the time evolution, and the results
+recorded inside the `ExpValueCallback` object as an `ExpValueSeries` for later analysis. The
+norm of the state, or the an equivalent quantity (trace, overlap of two sites...) where
+applicable, will also be computed after each step.
 The array `sites` is the same list of sites indices used to define MPSs and MPOs for the
 calculations.
 """
+function ExpValueCallback end
+
 function ExpValueCallback(
     operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
 )
@@ -34,6 +37,21 @@ function ExpValueCallback(
         operators,
         sites,
         Dict(x => ExpValueSeries() for x in operators),
+        # A single ExpValueSeries for each operator in the list.
+        ExpValueSeries(),  # for the norm, or the trace
+        Vector{Float64}(),  # time instants of measurement steps
+        measure_timestep,
+    )
+end
+
+function ExpValueCallback(
+    operators::AbstractString, sites::Vector{<:Index}, measure_timestep::Float64
+)
+    localops = parseoperators(operators)
+    return ExpValueCallback(
+        localops,
+        sites,
+        Dict(x => ExpValueSeries() for x in localops),
         # A single ExpValueSeries for each operator in the list.
         ExpValueSeries(),  # for the norm, or the trace
         Vector{Float64}(),  # time instants of measurement steps
