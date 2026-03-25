@@ -6,6 +6,14 @@ using MPSTimeEvolution: _sf_translate_sites, _sf_translate_sites_inv
 
 include("testset_skip.jl")
 
+@testset "Operator parsing" begin
+    @test parseoperators("a(2,3,4)") ==
+        [LocalOperator(2 => "a"), LocalOperator(3 => "a"), LocalOperator(4 => "a")]
+    @test parseoperators("a(1),b(4)") == [LocalOperator(1 => "a"), LocalOperator(4 => "b")]
+    @test parseoperators("a(1)b(3)") == [LocalOperator(Dict(1 => "a", 3 => "b"))]
+    @test_throws ArgumentError LocalOperator("a(1),b(3)")
+end
+
 include("norm_preservation.jl")
 @testset verbose=true "Norm/trace preservation" begin
     dt = 0.01

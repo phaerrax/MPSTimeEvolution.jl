@@ -1,4 +1,4 @@
-export LocalOperator
+export LocalOperator, parseoperators
 
 """
     LocalOperator(terms::OrderedDict{Int,AbstractString})
@@ -72,3 +72,103 @@ The MPS will have the factors in `l` prefixed by `v` on the domain of the operat
     # the non-memoized function takes 6.710 ms (97932 allocations: 30.36 MiB), while the
     # memoized one takes only 45.232 ns (1 allocation: 32 bytes).
 end
+
+# Easy input of LocalOperators
+
+function expandsequence(seq)
+    re = match(r"(?<name>\w+)\((?<sites>.+)\)", seq)
+    sites = parse.(Int, split(re["sites"], ","))
+    return [string(re["name"], "(", j, ")") for j in sites]
+end
+
+"""
+    parseoperators(s::AbstractString)
+
+Parse the string `s` as a list of `LocalOperator` objects, with the following rules:
+
+- operators are written as products of local operators of the form `name(site)` where
+    `name` is a string and `site` is an integer;
+- operators on different sites can be multiplied together by writing them one after the
+    other, i.e. `a(1)b(2)`;
+- for convenience, writing a comma-separated list of numbers in the parentheses expands to a
+    list of operators with the same name on each of the sites in the list, i.e. `a(1,2,3)`
+    is interpreted as `a(1),a(2),a(3)`.
+
+# Example
+
+```julia-repl
+julia> parseoperators("x(1)y(3),y(4),z(1,2,3)")
+5-element Vector{LocalOperator}:
+ x{1}y{3}
+ y{4}
+ z{1}
+ z{2}
+ z{3}
+```
+"""
+function parseoperators(s::AbstractString)
+    s *= ","  # add extra delimiter at the end (needed for regex below)
+    # Split each occurrence made by anything between a word character and "),",
+    # matching as few characters as possible between them.
+    opstrings = Base.chop.([r.match for r in eachmatch(r"\w+\(.+?\),", s * ",")])
+    ops = LocalOperator[]
+    i = 1
+    while i <= length(opstrings)
+        # Replace each sequence, i.e. an item like x(1,2,4), by its expansion.
+        if contains(opstrings[i], ",")  # it is a sequence
+            # ↖ Replace `opstrings[i]` with the expanded sequence, shifting the following
+            # elements in the array to the right to make space for it. Then, restart the
+            # loop iteration from the same index, which will be the first operator of the
+            # just expanded sequence.
+            splice!(opstrings, i:i, expandsequence(opstrings[i]))
+            continue
+        end
+        # Decide whether we have a product of operators, such as x(1)y(2), or a
+        # sequence such as x(1,2,3)
+        d = Dict()
+        foreach(
+            re -> push!(d, parse(Int, re["site"]) => re["name"]),
+            eachmatch(r"(?<name>\w+?)\((?<site>\d+?)\)", opstrings[i]),
+        )
+        push!(ops, LocalOperator(d))
+        i += 1
+    end
+
+    return ops
+end
+
+"""
+    parseoperators(d::Dict)
+
+Translate a dictionary into a list of `LocalOperator` objects, where each `(key, value)`
+pair is interpreted as the operator `key` (a string) on each of the sites contained in
+`value` (a list of integers), separately.
+This type of input does not support products of operators on different sites.
+
+# Example
+
+```julia-repl
+julia> ops = Dict("x" => [1, 2, 3], "y" => [2]);
+
+julia> parseoperators(ops)
+4-element Vector{LocalOperator}:
+ x{1}
+ x{2}
+ x{3}
+ y{2}
+```
+"""
+function parseoperators(d::Dict)
+    ops = LocalOperator[]
+    for (k, v) in d
+        for n in v
+            push!(ops, LocalOperator(Dict(n => k)))
+        end
+    end
+    return ops
+end
+
+# We reuse the `parseoperators` function to create a `LocalOperator` constructor: we parse
+# the string, and then ensure that there is only one operator (`only` throws an error if the
+# collection has more than one element).
+LocalOperator(s::AbstractString) = only(parseoperators(s))
