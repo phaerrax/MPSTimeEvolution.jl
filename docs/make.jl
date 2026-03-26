@@ -13,6 +13,8 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Reference" => "reference.md",
+        "Callback objects" => "callback_obj.md",
+        "Tutorial" => ["examples/tdvp1.md"],
     ],
     plugins=[bib],
     format=Documenter.HTML(;
@@ -50,6 +52,8 @@ makedocs(;
                         :real => [raw"_{\mathrm{r}}"],
                         :sb => [raw"_{#1}", 1],
                         :set => [raw"\{\, #1 \;\vert\; #2\,\}", 2],
+                        :spinup => [raw"\uparrow"],
+                        :spindown => [raw"\downarrow"],
                         :tr => [raw"\operatorname{tr}"],
                         :transpose => [raw"#1^{\mathrm{T}}", 1],
                         :tsp => [raw"^{\otimes #1}", 1],

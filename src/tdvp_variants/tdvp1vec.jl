@@ -23,7 +23,7 @@ latter case the evolution operator is taken to be the sum of the elements in the
 
 # Optional keyword arguments
 
-* `cb`: a callback object describing the observables.
+* `callback`: a callback object describing the observables.
 * `hermitian` (default: `false`): whether `L` is an Hermitian operator.
 * `exp_tol` (default: `1e-14`): accuracy per unit time for `KrylovKit.exponentiate`.
 * `krylovdim` (default: `30`): maximum dimension of the Krylov subspace that will be
