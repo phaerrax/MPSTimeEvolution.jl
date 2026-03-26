@@ -1,5 +1,4 @@
 using Documenter, DocumenterCitations
-using ITensors, ITensorMPS
 using MPSTimeEvolution
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style=:numeric)
