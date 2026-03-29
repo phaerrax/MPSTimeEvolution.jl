@@ -1,6 +1,6 @@
 # Standard TDVP1
 
-Let us see how this package works by looking at the ordinary TDVP1 method,
+Let's see how this package works by looking at the ordinary TDVP1 method,
 that is, the time-evolution algorithm for the Schrödinger equation.
 This is the algorithm described for example in [Lubich2015:tdvp_evolution,Haegeman2016:unifying_time_evolution_optimization_mps](@cite) and [Paeckel2019:time_evolution_methods](@cite).
 
@@ -12,7 +12,7 @@ We need an initial (pure) state and a Hamiltonian. We will take a simple system,
 a Heisenberg model given by
 
 ```math
-H = -\frac12 \sum_{j=1}^{N-1} \sigma^{(j)}_z \sigma^{(j+1)}_z +\sum_{j=1}^{N} \sigma^{(j)}_x,
+H = -\frac12 \sum_{n=1}^{N-1} \pauliz[n] \pauliz[n+1] +\sum_{n=1}^{N} \paulix[n]
 ```
 
 starting with a state with alternating magnetisation,
@@ -33,18 +33,20 @@ julia> ψₜ = MPS(s, n -> isodd(n) ? "↑" : "↓");
 
 julia> h = OpSum();
 
-julia> for j in 1:N
-           h += "σx", j
+julia> for n in 1:N
+           h += "σx", n
        end
 
-julia> for j in 1:N-1
-           h += -0.5, "σz", j, "σz", j+1
+julia> for n in 1:N-1
+           h += -0.5, "σz", n, "σz", n+1
        end
 
 julia> H = MPO(h, s);
 ```
 
-We will also choose the time-step and the total evolution time
+Here we constructed the Hamiltonian with the OpSum feature of ITensor, but any
+method is fine as long as, in the end, we have an MPO.
+We will also choose the time step and the total evolution time
 
 ```julia-repl
 julia> dt = 0.1; tmax = 1;
@@ -55,14 +57,21 @@ The first one is the _callback object_, which contains information about which
 operators we want to track, and how frequently.
 Callback objects are reviewed [here](@ref "Callback objects"); in this example,
 we define a callback object to track the \\(z\\)-axis magnetisation on the first
-five sites.
+three sites.
 
 ```julia-repl
-julia> cb = ExpValueCallback("Sz(1,2,3,4,5)", s, dt)
+julia> cb = ExpValueCallback("Sz(1,2,3)", s, dt)
 ExpValueCallback
-Operators: Sz{1}, Sz{2}, Sz{3}, Sz{4} and Sz{5}
+Operators: Sz{1}, Sz{2} and Sz{3}
 No measurements performed
 ```
+
+The last argument of `ExpValueCallback` determines how frequently the
+expectation values should be computed. Here we set it equal to `dt`, meaning
+that the expectation values will be computed after each time step. If we set it,
+for example, to `5dt`, then they would be computed only every fifth time step.
+This can be useful if we the expectation values are expensive to compute and we
+don't need them at every time step.
 
 We also want to provide three filenames, `io_file`, `io_ranks` and `io_times`,
 in which the output of the simulation will be printed step-by-step,
@@ -88,8 +97,8 @@ julia> time_file = "wallclock_time.csv";
 !!! warning "Preserving the initial state"
     The `tdvp1!` method, as the exclamation point in the name suggests, modifies
     its arguments, in this case the state MPS. If you want to preserve the
-    initial state for some reason, you need to explicitly copy it before the
-    evolution begins, for example by calling `ψ₀ = deepcopy(ψₜ)`.
+    initial state, you need to explicitly copy it before the evolution begins,
+    for example by calling `ψ₀ = deepcopy(ψₜ)`.
 
 Now we're all set! Let's call the `tdvp1!` method and begin the time evolution.
 

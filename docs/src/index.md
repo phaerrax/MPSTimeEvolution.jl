@@ -14,6 +14,8 @@ The package contains an implementation of the one-site time-dependent variationa
 
 See [Reference](@ref) for a complete list of features, and a description of the
 available methods.
+The Tutorial section contains step-by-step examples on how to use the key
+features of this package.
 
 ## Bibliography
 
