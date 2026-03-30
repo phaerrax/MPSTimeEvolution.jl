@@ -13,7 +13,11 @@ makedocs(;
         "Home" => "index.md",
         "Reference" => "reference.md",
         "Callback objects" => "callback_obj.md",
-        "Tutorial" => ["examples/tdvp1.md", "examples/tdvp1vec.md"],
+        "Tutorial" => [
+            "examples/tdvp1.md",
+            "examples/tdvp1vec.md",
+            "examples/time_dependent_tdvp.md",
+        ],
     ],
     plugins=[bib],
     format=Documenter.HTML(;
@@ -57,6 +61,7 @@ makedocs(;
                         :paulix => [raw"\sigma_x^{(#1)}", 1, ""],
                         :pauliy => [raw"\sigma_y^{(#1)}", 1, ""],
                         :pauliz => [raw"\sigma_z^{(#1)}", 1, ""],
+                        :phantomadj => [raw"^{\vphantom{\dagger}}"],
                         :real => [raw"_{\mathrm{r}}"],
                         :sb => [raw"_{#1}", 1],
                         :set => [raw"\{\, #1 \;\vert\; #2\,\}", 2],
