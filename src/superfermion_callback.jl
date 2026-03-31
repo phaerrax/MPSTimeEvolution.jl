@@ -61,8 +61,13 @@ function Base.show(io::IO, cb::SuperfermionCallback)
     if !isempty(measurement_ts(cb))
         println(
             io,
-            "Measured times: ",
-            first(callback_dt(cb)):callback_dt(cb):last(measurement_ts(cb)),
+            "Measured times:",
+            "\n  from ",
+            first(measurement_ts(cb)),
+            "\n  to ",
+            last(measurement_ts(cb)),
+            "\n  each ",
+            callback_dt(cb),
         )
     else
         println(io, "No measurements performed")
