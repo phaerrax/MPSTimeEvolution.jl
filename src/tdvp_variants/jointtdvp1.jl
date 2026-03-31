@@ -115,6 +115,7 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
     # Measure everything once in the initial state.
     current_time = 0.0
     apply!(cb, states..., TDVP1(); t=current_time, sweepend=true, sweepdir="left")
+    compute_overlap!(cb, states..., TDVP1(); current_time=current_time)
 
     printoutput_data(io_handle, cb, states...; kwargs...)
     printoutput_ranks(ranks_handle, cb, states...)
@@ -153,6 +154,7 @@ function jointtdvp1!(solver, states::Tuple{MPS,MPS}, PH, dt, tmax; kwargs...)
         end
 
         current_time += dt
+        compute_overlap!(cb, states..., TDVP1(); current_time=current_time)
 
         time_meas = @elapsed apply!(
             cb, states..., TDVP1(); t=current_time, sweepend=true, sweepdir="left"

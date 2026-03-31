@@ -95,6 +95,7 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
     # Measure everthing once in the initial state.
     current_time = 0.0
     apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+    compute_trace!(cb, state, TDVP1vec(); current_time=current_time)
 
     if store_state0
         printoutput_data(io_handle, cb, state; psi0=state0, vectorized=true, kwargs...)
@@ -129,6 +130,7 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
         end
 
         current_time += dt
+        compute_trace!(cb, state, TDVP1vec(); current_time=current_time)
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
@@ -228,6 +230,7 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwa
     # Measure everthing once in the initial state.
     current_time = 0.0
     apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+    compute_trace!(cb, state, TDVP1vec(); current_time=current_time)
 
     if store_state0
         printoutput_data(io_handle, cb, state; psi0=state0, vectorized=true, kwargs...)
@@ -269,6 +272,7 @@ function adaptivetdvp1vec!(solver, state::MPS, PH, dt::Number, tmax::Number; kwa
         end
 
         current_time += dt
+        compute_trace!(cb, state, TDVP1vec(); current_time=current_time)
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.

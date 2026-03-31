@@ -141,9 +141,18 @@ function measure_localops!(cb::ExpValueCallback, state::MPS, site::Int, alg::TDV
         # which we (must) have created in `apply!` before calling this function.
     end
 
-    if site == 1
-        measurements_norm(cb)[end] = norm(state)
-        # No optimisation needed here---ITensors uses the orthocentre only already.
+    return nothing
+end
+
+function compute_norm!(cb::ExpValueCallback, state::MPS, alg::TDVP1; current_time)
+    if isempty(measurement_ts(cb))
+        prev_t = 0
+    else
+        prev_t = measurement_ts(cb)[end]
+    end
+    # No optimisation needed here---ITensors uses the orthocentre only already.
+    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
+        push!(measurements_norm(cb), norm(state))
     end
 
     return nothing
@@ -172,7 +181,20 @@ function measure_localops!(cb::ExpValueCallback, psiL::MPS, psiR::MPS, alg::TDVP
         # which we (must) have created in apply! before calling this function.
     end
 
-    measurements_norm(cb)[end] = dot(psiL, psiR)
+    return nothing
+end
+
+function compute_overlap!(
+    cb::ExpValueCallback, psiL::MPS, psiR::MPS, alg::TDVP1; current_time
+)
+    if isempty(measurement_ts(cb))
+        prev_t = 0
+    else
+        prev_t = measurement_ts(cb)[end]
+    end
+    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
+        push!(measurements_norm(cb), dot(psiL, psiR))
+    end
 
     return nothing
 end
@@ -217,8 +239,38 @@ function measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)
         # which we (must) have created in `apply!` before calling this function.
     end
 
-    # Now measure the trace, too.
-    measurements_norm(cb)[end] = scalar(prod(ids))
+    # Since computing `ids` might require a little time, we return it so that other methods
+    # can reuse the results.
+    return ids
+end
+
+function compute_trace!(
+    cb::ExpValueCallback, ids::Vector{ITensor}, alg::TDVP1vec; current_time
+)
+    if isempty(measurement_ts(cb))
+        prev_t = 0
+    else
+        prev_t = measurement_ts(cb)[end]
+    end
+    # From precomputed `ids`: we just multiply the elements together.
+    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
+        push!(measurements_norm(cb), scalar(prod(ids)))
+    end
+
+    return nothing
+end
+
+function compute_trace!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec; current_time)
+    if isempty(measurement_ts(cb))
+        prev_t = 0
+    else
+        prev_t = measurement_ts(cb)[end]
+    end
+    # From scratch: we contract each tensor from `ψ` with the identity, separately.
+    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
+        ids = [state("vId", siteind(ψ, n)) * ψ[n] for n in eachindex(ψ)]
+        push!(measurements_norm(cb), scalar(prod(ids)))
+    end
 
     return nothing
 end
@@ -227,29 +279,37 @@ function apply!(
     cb::ExpValueCallback, state::MPS, alg::TDVP1; t, sweepend, sweepdir, site, kwargs...
 )
     if isempty(measurement_ts(cb))
-        prev_t = 0.0
         # Initialize `cb` here.
+        @debug "No measurements found (t = $t). Initialising callback object."
+        prev_t = 0.0
         push!(measurement_ts(cb), t)
-        foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
-        push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+        foreach(values(measurements(cb))) do v
+            push!(v, zero(eltype(v)))
+        end
+        #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
     else
         prev_t = measurement_ts(cb)[end]
+        @debug "Found previous measurements (t = $t, prev_t = $prev_t)."
     end
 
     # We perform measurements only at the end of a sweep and at measurement steps.
-    # For TDVP we can perform measurements to the right of each site when sweeping back left.
+    # For TDVP we can perform measurements to the right of each site when sweeping back
+    # left.
     if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend && sweepdir == "left"
-        @debug "Computing expectation values on site $site at t = $t (prev_t = $prev_t)"
         if t != prev_t
+            @debug "Adding t = $t to the list of time instants of the callback."
             # Add the current time to the list of time instants at which we measured
             # something.
             push!(measurement_ts(cb), t)
             # Create a new slot in which we will put the measurement result.
-            foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
-            if site == 1
-                push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+            foreach(values(measurements(cb))) do v
+                push!(v, zero(eltype(v)))
             end
         end
+        #if site == 1
+        #    push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+        #end
+        @debug "Computing expectation values on site $site at t = $t (prev_t = $prev_t)"
         measure_localops!(cb, state, site, alg)
     end
 
@@ -272,8 +332,8 @@ function apply!(
         prev_t = measurement_ts(cb)[end]
     end
 
-    # We perform measurements only at the end of a sweep and at measurement steps.
-    # For TDVP we can perform measurements to the right of each site when sweeping back left.
+    # We perform measurements only at the end of a sweep and at measurement steps.  For TDVP
+    # we can perform measurements to the right of each site when sweeping back left.
     if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend && sweepdir == "left"
         @debug "Computing expectation values at t = $t (prev_t = $prev_t)"
         if (t != prev_t || t == 0)
@@ -282,7 +342,7 @@ function apply!(
             push!(measurement_ts(cb), t)
             # Create a new slot in which we will put the measurement result.
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
-            push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+            #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
         end
         measure_localops!(cb, state1, state2, alg)
     end
@@ -306,7 +366,7 @@ function apply!(cb::ExpValueCallback, state::MPS, alg::TDVP1vec; t, sweepend, kw
             push!(measurement_ts(cb), t)
             # Create a new slot in which we will put the measurement result.
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
-            push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+            #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
         end
         measure_localops!(cb, state, alg)
     end

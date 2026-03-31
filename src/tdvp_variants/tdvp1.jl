@@ -96,6 +96,7 @@ function tdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
         orthogonalize!(state, j)
         apply!(cb, state, TDVP1(); t=current_time, site=j, sweepend=true, sweepdir="left")
     end
+    compute_norm!(cb, state, TDVP1(); current_time=current_time)
 
     # Prepare for first iteration.
     set_nsite!(PH, 1)
@@ -237,6 +238,7 @@ function tdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
         end
 
         current_time += dt
+        compute_norm!(cb, state, TDVP1(); current_time=current_time)
 
         !isnothing(pbar) &&
             ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
@@ -326,6 +328,7 @@ function adaptivetdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
         orthogonalize!(state, j)
         apply!(cb, state, TDVP1(); t=current_time, site=j, sweepend=true, sweepdir="left")
     end
+    compute_norm!(cb, state, TDVP1(); current_time=current_time)
 
     if store_state0
         printoutput_data(io_handle, cb, state; psi0=state0, kwargs...)
@@ -467,6 +470,7 @@ function adaptivetdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
             ProgressMeter.next!(pbar; showvalues=simulationinfo(state, current_time, stime))
 
         current_time += dt
+        compute_norm!(cb, state, TDVP1(); current_time=current_time)
 
         if !isempty(measurement_ts(cb)) && current_time ≈ measurement_ts(cb)[end]
             if store_state0

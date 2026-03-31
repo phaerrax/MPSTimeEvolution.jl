@@ -132,8 +132,42 @@ function measure_localops!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec)
         # which we (must) have created in `apply!` before calling this function.
     end
 
-    # Now measure the trace, too.
-    measurements_norm(cb)[end] = scalar(prod(ids))
+    # Since computing `ids` might require a little time, we return it so that other methods
+    # can reuse the results.
+    return ids
+end
+
+function compute_trace!(
+    cb::SuperfermionCallback, ids::Vector{ITensor}, alg::TDVP1vec; current_time
+)
+    if isempty(measurement_ts(cb))
+        prev_t = 0
+    else
+        prev_t = measurement_ts(cb)[end]
+    end
+    # From precomputed `ids`: we just multiply the elements together.
+    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
+        push!(measurements_norm(cb), scalar(prod(ids)))
+    end
+
+    return nothing
+end
+
+function compute_trace!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec; current_time)
+    if isempty(measurement_ts(cb))
+        prev_t = 0
+    else
+        prev_t = measurement_ts(cb)[end]
+    end
+    # From scratch: we contract each tensor from `ψ` with the identity, separately.
+    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
+        sf_id_blocks = _sf_id_pairs(siteinds(ψ))
+        ids = [
+            dag(sf_id_blocks[_sf_translate_sites_inv(n)]) * ψ[n] * ψ[n + 1] for
+            n in eachindex(ψ)[1:2:end]
+        ]
+        push!(measurements_norm(cb), scalar(prod(ids)))
+    end
 
     return nothing
 end
@@ -152,7 +186,7 @@ function apply!(cb::SuperfermionCallback, state::MPS, alg::TDVP1vec; t, sweepend
             push!(measurement_ts(cb), t)
             # Create a new slot in which we will put the measurement result.
             foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
-            push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+            #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
         end
         measure_localops!(cb, state, alg)
     end
