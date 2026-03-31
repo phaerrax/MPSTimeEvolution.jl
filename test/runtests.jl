@@ -69,9 +69,9 @@ include("compare_tdvp_methods.jl")
             init=alternate,
         )
 
-        # A vanilla `isapprox` test with ours and ITensor's TDVP functions usually fails, as it
-        # imposes a too stringent condition. The two functions do give 𝑎𝑝𝑝𝑟𝑜𝑥𝑖𝑚𝑎𝑡𝑒𝑙𝑦 equal
-        # results but not with the default rtol/atol set in `isapprox`.
+        # A vanilla `isapprox` test with ours and ITensor's TDVP functions usually fails, as
+        # it imposes a too stringent condition. The two functions do give 𝑎𝑝𝑝𝑟𝑜𝑥𝑖𝑚𝑎𝑡𝑒𝑙𝑦
+        # equal results but not with the default rtol/atol set in `isapprox`.
         @test all(
             all(isapprox.(r1, r2; atol=atol)) for
             (r1, r2) in zip(itensors_result, res_tdvp1)
@@ -79,8 +79,8 @@ include("compare_tdvp_methods.jl")
     end
 
     @testset verbose=true "Compare different TDVP methods" begin
-        # It's best to choose sites that start from an occupied state, to avoid slight numerical
-        # instabilities that could make `isapprox` fail.
+        # It's best to choose sites that start from an occupied state, to avoid slight
+        # numerical instabilities that could make `isapprox` fail.
         @testset "TDVP1 with quantum numbers" begin
             res_tdvp1_with_qns = siam_tdvp1_with_qns(;
                 dt=dt,

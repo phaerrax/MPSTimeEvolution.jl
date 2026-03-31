@@ -412,7 +412,7 @@ function siam_adaptivetdvp1(;
         dt,
         tmax;
         callback=cb,
-        progress=true,
+        progress=false,
         io_file=tmpfile,
         io_ranks="/dev/null",
         io_times="/dev/null",
