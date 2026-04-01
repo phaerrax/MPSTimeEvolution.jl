@@ -11,8 +11,11 @@ makedocs(;
     authors="Davide Ferracin and Dario Tamascelli",
     pages=[
         "Home" => "index.md",
-        "Reference" => "reference.md",
-        "Callback objects" => "callback_obj.md",
+        "Reference" => [
+            "Local operators" => "reference/localoperators.md",
+            "Callback objects" => "reference/callback_obj.md",
+            "Complete reference" => "reference/reference.md",
+        ],
         "Tutorial" => [
             "examples/tdvp1.md",
             "examples/tdvp1vec.md",

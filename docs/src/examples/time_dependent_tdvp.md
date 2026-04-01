@@ -1,16 +1,16 @@
 # Time-dependent TDVP1
 
 In this tutorial we will see how to solve the Schrödinger equation with a
-time-dependent Hamiltonian with the TDVP1 method.
+time-dependent Hamiltonian using the TDVP1 method.
 
 !!! warning "Why'd you have to go and make things so complicated?"
     There isn't a nice interface to define and solve a time-dependent ODE
     problem with TDVP yet. As a consequence, we will need to cobble together
     some methods and types from ITensorMPS which will allow us to use a
-    time-dependent Hamiltonian in an efficient way. However, this methods are
+    time-dependent Hamiltonian in an efficient way. However, these methods are
     rather obscure as they are not documented, and they are probably still in a
     development phase. For this reason, this tutorial will be quite technical,
-    and there is no guarantee that it will keep working in the future, as
+    and there is no guarantee that it will keep working in the future, because
     development in ITensorMPS might break some of the definitions we will make
     here.
 
