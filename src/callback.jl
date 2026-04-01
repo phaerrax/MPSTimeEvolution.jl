@@ -6,7 +6,9 @@ export TEvoCallback,
     createObs,
     LocalPosMeasurementCallback,
     LocalPosVecMeasurementCallback,
-    measurement_ts
+    measurement_ts,
+    measurements_norm,
+    expvalues
 
 """
 A TEvoCallback can implement the following methods:
@@ -33,6 +35,24 @@ struct NoTEvoCallback <: TEvoCallback end
 apply!(cb::NoTEvoCallback, args...; kwargs...) = nothing
 checkdone!(cb::NoTEvoCallback, args...; kwargs...) = false
 callback_dt(cb::NoTEvoCallback) = 0
+
+"""
+    expvalues(cb::ExpValueCallback)
+    expvalues(cb::ExpValueCallback, lop::LocalOperator)
+    expvalues(cb::ExpValueCallback, name::AbstractString)
+
+    expvalues(cb::SuperfermionCallback)
+    expvalues(cb::SuperfermionCallback, lop::LocalOperator)
+    expvalues(cb::SuperfermionCallback, name::AbstractString)
+
+Retrieve the expectation values of the operators stored in the callback `cb`.  The time
+series of an individual operator `lop` within `cb` can be directly accessed by
+`expvalues(cb, lop)`, where `lop` is either a `LocalOperator` or a string that defines a
+single `LocalOperator`.
+"""
+function expvalues end
+
+expvalues(cb::NoTEvoCallback) = nothing
 
 """
     A Measurement object is an alias for `Vector{Float64}`, in other words an

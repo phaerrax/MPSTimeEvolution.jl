@@ -20,7 +20,7 @@ end
 
 Construct an `ExpValueCallback`, providing some `operators` and a list of ITensor `sites`. 
 The `operator` variable can be either a vector of `LocalOperator` objects, or a string (see
-`parseoperators` for instructions on the allowed syntax).  Each of operators will be
+`parseoperators` for instructions on the allowed syntax).  Each operator will be
 measured on the associated sites during every step of the time evolution, and the results
 recorded inside the `ExpValueCallback` object as an `ExpValueSeries` for later analysis. The
 norm of the state, or the an equivalent quantity (trace, overlap of two sites...) where
@@ -65,6 +65,10 @@ callback_dt(cb::ExpValueCallback) = cb.measure_timestep
 measurements_norm(cb::ExpValueCallback) = cb.norm
 ops(cb::ExpValueCallback) = cb.operators
 sites(cb::ExpValueCallback) = cb.sites
+
+expvalues(cb::ExpValueCallback) = cb.measurements
+expvalues(cb::ExpValueCallback, lop::LocalOperator) = cb.measurements[lop]
+expvalues(cb::ExpValueCallback, name::AbstractString) = expvalues(cb, LocalOperator(name))
 
 function Base.show(io::IO, cb::ExpValueCallback)
     println(io, "ExpValueCallback")
