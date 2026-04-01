@@ -47,7 +47,7 @@ just as in the tutorial for the unitary TDVP1 algorithm.
     and returns an OpSum object representing \\(-\iu[S,\blank]\\) where \\(S\\)
     is the product of each `sk` on site `nk`.
     
-    ```julia-repl
+    ```jldoctest; setup = :(using LindbladVectorizedTensors)
     julia> gkslcommutator("A", 1, "B", 3)
     sum(
       0.0 - 1.0im A⋅(1,) B⋅(3,)
@@ -58,7 +58,7 @@ just as in the tutorial for the unitary TDVP1 algorithm.
     In this notation, `A⋅` is an operator that multiplies by `A` on the left,
     while `⋅A` is the multiplication on the right.
 
-```julia-repl
+```jldoctest tdvp1vec
 julia> using ITensorMPS, MPSTimeEvolution, LindbladVectorizedTensors
 
 julia> N = 10; s = siteinds("vS=1/2", N);
@@ -90,7 +90,7 @@ We also add some non unitary terms:
 
 on the first and last sites, `n = 1` and `n = N`.
 
-```julia-repl
+```jldoctest tdvp1vec
 julia> for n in [1,N]
            ℓ += "σ-⋅ * ⋅σ+", n
            ℓ += -0.5, "σ+⋅ * σ-⋅", n
@@ -104,20 +104,20 @@ right by \\(\sigma\sb+\\), then by \\(\sigma\sb-\\).)
 
 Finally we construct the MPO:
 
-```julia-repl
+```jldoctest tdvp1vec
 julia> L = MPO(ℓ, s);
 ```
 
 We set the time step and the total evolution time to
 
-```julia-repl
+```jldoctest tdvp1vec
 julia> dt = 0.1; tmax = 1;
 ```
 
 and we define a callback object to track the \\(z\\)-axis magnetisation on the
 first three sites:
 
-```julia-repl
+```jldoctest tdvp1vec
 julia> cb = ExpValueCallback("Sz(1,2,3)", s, dt)
 ExpValueCallback
 Operators: Sz{1}, Sz{2} and Sz{3}
@@ -144,31 +144,23 @@ here `hermitian=false` by default, which is what we want.
     be monitored during the evolution; the expectation values will then need to
     be divided by \\(\tr\rho\sb{t}\\).
 
-Let's assign
+Let's assign some temporary files to the output arguments:
 
-```julia-repl
-julia> meas_file = "measurements.csv";
+```jldoctest tdvp1vec
+julia> meas_file = mktemp();
 
-julia> bdim_file = "bond_dimensions.csv";
+julia> bdim_file = mktemp();
 
-julia> time_file = "wallclock_time.csv";
+julia> time_file = mktemp();
 ```
 
 and finally start the evolution, by calling the `tdvp1vec!` method.
 
-```julia-repl
-julia> tdvp1vec!(ρₜ, L, dt, tmax; callback=cb, io_file=meas_file, io_ranks=bdim_file, io_times=time_file)
-Evolving state... 100%|████████████████████████████████████████████████| Time: 0:00:29
-                        t: 0.9999999999999999
-   Maximum bond dimension: 1
-         Wall time / step: 0.007
-           MPS size / MiB: 0.006
-            GC live / MiB: 109.406
-                JIT / MiB: 8.944
-           Max. RSS / GiB: 0.882
+```jldoctest tdvp1vec
+julia> tdvp1vec!(ρₜ, L, dt, tmax; callback=cb, io_file=meas_file, io_ranks=bdim_file, io_times=time_file, progress=false);
 ```
 
-The output files look like the ones in [Standard TDVP1](@ref):
+The output files look like the ones in [Standard TDVP1](@ref): `meas_file` is
 
 ```csv
 time,Sz{1}_re,Sz{1}_im,Sz{2}_re,Sz{2}_im,Sz{3}_re,Sz{3}_im,Norm_re,Norm_im
@@ -189,5 +181,5 @@ While the `tdvp1!` method prints the 2-norm of the pure state under the
 `Norm_re` and `Norm_im` columns, the `tdvp1vec!` method prints the trace of the
 mixed state instead.  In this case, we see that \\(\tr\rho\sb{t}\\) is
 approximately 1 for the whole evolution, which is good.
-The other two files `bond_dimensions.csv` and `wallclock_time.csv` are
+The other two files `bdim_file` and `time_file` are
 completely analogous to the ones in the unitary case.

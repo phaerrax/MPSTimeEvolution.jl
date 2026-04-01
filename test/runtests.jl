@@ -1,10 +1,13 @@
-using MPSTimeEvolution
-using Test
+using Test, Documenter, MPSTimeEvolution
 using ITensors, ITensorMPS, LindbladVectorizedTensors, Observers, CSV
 
 using MPSTimeEvolution: _sf_translate_sites, _sf_translate_sites_inv
 
 include("testset_skip.jl")
+
+@testset "Documentation examples" begin
+    doctest(MPSTimeEvolution; manual=false)
+end
 
 @testset "Operator parsing" begin
     @test parseoperators("a(2,3,4)") ==

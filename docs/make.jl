@@ -1,6 +1,9 @@
 using Documenter, DocumenterCitations
 using MPSTimeEvolution
 
+# doctest dependencies
+using ITensors, ITensorMPS, KrylovKit, LindbladVectorizedTensors
+
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style=:numeric)
 
 makedocs(;

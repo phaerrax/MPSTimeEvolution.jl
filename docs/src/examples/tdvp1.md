@@ -24,7 +24,7 @@ starting with a state with alternating magnetisation,
 Let's review what we need to set up in order to use the `tdvp1!` method.  First
 of all, we define the state and Hamiltonian objects in Julia, with ITensor.
 
-```julia-repl
+```jldoctest tdvp1
 julia> using ITensorMPS, MPSTimeEvolution
 
 julia> N = 10; s = siteinds("S=1/2", N);
@@ -48,7 +48,7 @@ Here we constructed the Hamiltonian with the OpSum feature of ITensor, but any
 method is fine as long as, in the end, we have an MPO.
 We will also choose the time step and the total evolution time
 
-```julia-repl
+```jldoctest tdvp1
 julia> dt = 0.1; tmax = 1;
 ```
 
@@ -59,7 +59,7 @@ Callback objects are reviewed [here](@ref "Callback objects"); in this example,
 we define a callback object to track the \\(z\\)-axis magnetisation on the first
 three sites.
 
-```julia-repl
+```jldoctest tdvp1
 julia> cb = ExpValueCallback("Sz(1,2,3)", s, dt)
 ExpValueCallback
 Operators: Sz{1}, Sz{2} and Sz{3}
@@ -84,14 +84,14 @@ respectively:
   algorithm.
 
 For the other keyword arguments, the default value is already enough.
-Let's assign
+Let's create three temporary files in which to store the results:
 
-```julia-repl
-julia> meas_file = "measurements.csv";
+```jldoctest tdvp1
+julia> meas_file = mktemp();
 
-julia> bdim_file = "bond_dimensions.csv";
+julia> bdim_file = mktemp();
 
-julia> time_file = "wallclock_time.csv";
+julia> time_file = mktemp();
 ```
 
 !!! warning "Preserving the initial state"
@@ -102,16 +102,8 @@ julia> time_file = "wallclock_time.csv";
 
 Now we're all set! Let's call the `tdvp1!` method and begin the time evolution.
 
-```julia-repl
-julia> tdvp1!(ψₜ, H, dt, tmax; callback=cb, io_file=meas_file, io_ranks=bdim_file, io_times=time_file)
-Evolving state... 100%|████████████████████████| Time: 0:00:35
-                        t: 0.9999999999999999
-   Maximum bond dimension: 1
-         Wall time / step: 0.007
-           MPS size / MiB: 0.006
-            GC live / MiB: 152.359
-                JIT / MiB: 11.241
-           Max. RSS / GiB: 1.174
+```jldoctest tdvp1
+julia> tdvp1!(ψₜ, H, dt, tmax; callback=cb, io_file=meas_file, io_ranks=bdim_file, io_times=time_file, progress=false);
 ```
 
 Some information about the simulation, such as the total memory used, is printed
@@ -126,7 +118,7 @@ with the progress bar and updated with every step.
     the results computed up to that point remain available in the external
     files.
 
-Here is how the output file `measurements.csv` looks:
+Here is how the output file `meas_file` looks:
 
 ```csv
 time,Sz{1}_re,Sz{1}_im,Sz{2}_re,Sz{2}_im,Sz{3}_re,Sz{3}_im,Norm_re,Norm_im
@@ -150,7 +142,7 @@ It is a CSV file whose columns represent:
   real and imaginary parts (useful when the operator is not Hermitian);
 * The norm of the MPS.
 
-The `bond_dimensions.csv` file looks like this:
+The `bdim_file` file looks like this:
 
 ```csv
 time,1,2,3,4,5,6,7,8,9
@@ -182,7 +174,7 @@ bond dimensions.
     MPS with a bond dimension of 5 everywhere, we would call `enlargelinks(ψₜ,
     5)`.
 
-Finally, the `wallclock_time.csv` file is a simple list, that prints the
+Finally, the `time_file` file is a simple list, that prints the
 real-world time (in seconds) that the evolution algorithm took for each step. It
 should have one row less than the previous two files, as they also include data
 on the initial state.

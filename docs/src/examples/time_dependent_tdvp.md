@@ -46,7 +46,7 @@ Let's define these operators with ITensor.
 We also choose as the initial condition a state where all sites contain an
 electron in the “down” state.
 
-```julia-repl
+```jldoctest time_dependent_tdvp
 julia> using ITensorMPS, MPSTimeEvolution
 
 julia> N = 6; s = siteinds("Electron", N);
@@ -84,7 +84,7 @@ normally implicitly set to the default solver, the `exponentiate` method from
 First, we define a time-dependent version of `exponentiate` (with the same
 structure as `exponentiate`):
 
-```julia-repl
+```jldoctest time_dependent_tdvp; filter = r"time_dependent_exp (generic function with \d\+ methods?)", output = false
 julia> using KrylovKit: exponentiate
 
 julia> using ITensorMPS: TimeDependentSum
@@ -95,6 +95,8 @@ julia> function time_dependent_exp(
            ψₜ, info = exponentiate(H(current_time), time_step, ψ₀; kwargs...)
            return ψₜ, info
        end
+time_dependent_exp (generic function with 1 method)
+
 ```
 
 The first argument `TimeDependentSum` is a struct, defined in `ITensorMPS` (but
@@ -105,8 +107,8 @@ means that it can be used to define a function like \\(H(t)\\).
 In our case, we can write \\(H(t)\\) from \eqref{eq:time-dependent-hamiltonian}
 as follows, once we choose a value for \\(T\\):
 
-```julia-repl
-julia> T = 10;
+```jldoctest time_dependent_tdvp
+julia> T = 2;
 
 julia> ramp(t) = min(t / T, one(t));
 
@@ -117,12 +119,14 @@ Here `one` is the function that returns the multiplicative identity for its
 argument, i.e. `one(t)` returns `1.0` if `t` is a `Float64`.
 We define the time-dependent solver as follows:
 
-```julia-repl
+```jldoctest time_dependent_tdvp; filter = r"time_dependent_solver (generic function with \d\+ methods?)", output = false
 julia> function time_dependent_solver(PHs::ProjMPOSum, time_step, ψ₀; kwargs...)
            return time_dependent_exp(
                TimeDependentSum(fs, PHs), time_step, ψ₀; ishermitian=true, kwargs...
            )
        end
+time_dependent_solver (generic function with 1 method)
+
 ```
 
 This function will be used inside `tdvp1!`, precisely in the `tdvp_site_update!`
@@ -143,17 +147,10 @@ method.
     together with its partial projections on the left and right parts of the
     MPS.
 
-Now we set the variables related to the time and the output files, and the
-callback operator:
+Now we set the variables related to time, and the callback operator:
 
-```julia-repl
+```jldoctest time_dependent_tdvp
 julia> dt = 0.01; tmax = 2T;
-
-julia> meas_file = "measurements.csv";
-
-julia> bdim_file = "bond_dimensions.csv";
-
-julia> time_file = "wallclock_time.csv";
 
 julia> cb = ExpValueCallback("Nup(1,5),Ndn(1,5)", s, dt);
 ```
@@ -165,7 +162,7 @@ defined by ITensorMPS, so we need to do a bit of “plumbing” ourselves.
 Specifically, we need to extend the two `Base.iterate` methods to the
 `ProjMPOSum` type, so that Julia can use them:
 
-```julia-repl
+```jldoctest time_dependent_tdvp
 julia> Base.iterate(PH::ProjMPOSum, state) = iterate(PH.terms, state)
 
 julia> Base.iterate(PH::ProjMPOSum) = iterate(PH.terms)
@@ -175,14 +172,17 @@ julia> Base.iterate(PH::ProjMPOSum) = iterate(PH.terms)
     With these definitions, we are extending methods in Base on a type from
     a package we do not “own”, ITensorMPS. In Julia this is usually called
     [type
-    piracy](https://docs.julialang.org/en/v1/manual/style-guide/#avoid-type-piracy).
+    piracy](https://docs.julialang.org/en/v1/manual/style-guide/#avoid-type-piracy)
+    and should be approached carefully (since, for example, ITensorMPS may in
+    the future define such `iterate` methods differently, and our definitions
+    would then be in conflict).
     Here we are doing in an isolated interactive session, so no problems should
     arise. Be careful when doing this elsewhere.
 
 Now that `iterate` is properly extended, we can finally call `tdvp1!` with
 everything we defined:
 
-```julia-repl
+```jldoctest time_dependent_tdvp
 julia> tdvp1!(
            time_dependent_solver,
            ψ₀,
@@ -191,10 +191,8 @@ julia> tdvp1!(
            tmax,
            callback=cb,
            ishermitian=true,
-           io_file=meas_file,
-           io_ranks=bdim_file,
-           io_times=time_file
-       )
+           progress=false
+       );
 ```
 
 !!! tip "A more efficient solution"

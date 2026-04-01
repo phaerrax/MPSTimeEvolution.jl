@@ -46,7 +46,7 @@ site type, and we want to measure the average occupation number on each site.
 We also want to compute these values not after every time step, but only after
 ten time steps.  This is how we need to define the callback object.
 
-```julia-repl
+```jldoctest callback_obj
 julia> using ITensorMPS, MPSTimeEvolution
 
 julia> dt = 0.1;  # the time step for the time evolution
@@ -77,7 +77,7 @@ Alternatively, `cb` can be defined with the more compact (and readable) syntax
 of the [parseoperators](@ref) function.  If we wanted to compute, for example,
 the average occupation number on the first four sites, we would write
 
-```julia-repl
+```jldoctest callback_obj
 julia> cb = ExpValueCallback("N(1,2,3,4)", sites, 10dt)
 ExpValueCallback
 Operators: N{1}, N{2}, N{3} and N{4}
@@ -92,7 +92,7 @@ creating it is very simple. For example, let's consider the operator
 \\(X=\frac{1}{\sqrt{2}}(a+\adj{a})\\): we simply have to define a new ITensor
 `op` as
 
-```julia-repl
+```jldoctest callback_obj
 julia> using ITensors
 
 julia> ITensors.op(::OpName"X", ::SiteType"Boson", s::Index) = 1/sqrt(2) * op("a† + a", s)
@@ -100,7 +100,7 @@ julia> ITensors.op(::OpName"X", ::SiteType"Boson", s::Index) = 1/sqrt(2) * op("a
 
 Now we can use it in our callback by adding it to the list, for example:
 
-```julia-repl
+```jldoctest callback_obj
 julia> cb = ExpValueCallback("N(1,2,3,4),X(1,2,3,4)", sites, 10dt);
 ```
 
@@ -112,7 +112,7 @@ the `"N(1,2,3,4),X(1,2,3,4)"` operators.
 Let's set up a Hamiltonian operator and run a quick simulation with TDVP1 (see
 the [TDVP1 tutorial](@ref "Standard TDVP1")):
 
-```julia-repl
+```jldoctest callback_obj
 julia> v = MPS(sites, n -> n == 1 ? "1" : "0");
 
 julia> v = enlargelinks(v, 4);
@@ -130,26 +130,18 @@ julia> for n in 1:N-1
 
 julia> H = MPO(h, sites);
 
-julia> tdvp1!(v, H, dt, 20; callback=cb)
-Evolving state... 100%|██████████████████████████████████████████████████| Time: 0:00:26
-                        t: 20.000000000000014
-   Maximum bond dimension: 4
-         Wall time / step: 0.017
-           MPS size / MiB: 0.012
-            GC live / MiB: 119.781
-                JIT / MiB: 9.976
-           Max. RSS / GiB: 0.894
+julia> tdvp1!(v, H, dt, 10; callback=cb, progress=false);
 ```
 
 By invoking `cb` we can see that there is new information:
 
-```julia-repl
+```jldoctest callback_obj
 julia> cb
 ExpValueCallback
 Operators: N{1}, N{2}, N{3}, N{4}, X{1}, X{2}, X{3} and X{4}
 Measured times:
   from 0.0
-  to 20.000000000000014
+  to 4.999999999999998
   each 1.0
 
 
@@ -159,17 +151,17 @@ The computed expectation values can be accessed by calling the `expvalues`
 method on the callback: the result is a dictionary where each local operator is
 assigned the series of its expectation values.
 
-```julia-repl
+```jldoctest callback_obj
 julia> expvalues(cb)
 Dict{LocalOperator, Vector{ComplexF64}} with 8 entries:
-  N{2} => [0.0+0.0im, 0.497967+0.0im, 0.132586+0.0im, 0.0262118+0.0im,…
-  X{3} => [0.0+0.0im, -1.14256e-6+3.43722e-22im, -2.63261e-5-4.06683e-…
-  X{4} => [0.0+0.0im, 4.27215e-5-2.05802e-21im, 0.000124825-1.03762e-2…
-  X{2} => [0.0+0.0im, -1.61758e-6+6.61744e-23im, -2.2168e-6-2.60208e-1…
-  X{1} => [0.0+0.0im, -1.13453e-6-4.60006e-23im, -3.93457e-6-2.03123e-…
-  N{1} => [1.0+0.0im, 0.332612+0.0im, 0.00109072+0.0im, 0.00850228+0.0…
-  N{3} => [0.0+0.0im, 0.149637+0.0im, 0.416359+0.0im, 0.0131695+0.0im,…
-  N{4} => [0.0+0.0im, 0.0184514+0.0im, 0.316095+0.0im, 0.227534+0.0im,…
+  N{2} => [0.0+0.0im, 0.497967+0.0im, 0.132586+0.0im, 0.0262118+0.0im, 0.003191…
+  X{3} => [0.0+0.0im, -1.14256e-6+3.43722e-22im, -2.63261e-5-4.06683e-20im, -2.…
+  X{4} => [0.0+0.0im, 4.27215e-5-2.05802e-21im, 0.000124825-1.03762e-20im, 5.01…
+  X{2} => [0.0+0.0im, -1.61758e-6+6.61744e-23im, -2.2168e-6-2.60208e-18im, -2.1…
+  X{1} => [0.0+0.0im, -1.13453e-6-4.60006e-23im, -3.93457e-6-2.03123e-22im, -2.…
+  N{1} => [1.0+0.0im, 0.332612+0.0im, 0.00109072+0.0im, 0.00850228+0.0im, 0.003…
+  N{3} => [0.0+0.0im, 0.149637+0.0im, 0.416359+0.0im, 0.0131695+0.0im, 0.047656…
+  N{4} => [0.0+0.0im, 0.0184514+0.0im, 0.316095+0.0im, 0.227534+0.0im, 0.011087…
 
 ```
 
@@ -177,28 +169,24 @@ The time series for individual operators can be accessed via the `expvalues(cb,
 lop)` syntax, where `lop` is either a `LocalOperator` or a string that defines a
 single `LocalOperator`.
 
-```julia-repl
+```jldoctest callback_obj
 julia> expvalues(cb, LocalOperator(3 => "N"))
-21-element Vector{ComplexF64}:
+6-element Vector{ComplexF64}:
                    0.0 + 0.0im
     0.1496371087008667 + 0.0im
     0.4163587833281586 + 0.0im
   0.013169546650199981 + 0.0im
   0.047656092490155594 + 0.0im
  0.0012094869867415171 + 0.0im
-  0.009031865524793884 + 0.0im
-[...]
 
 julia> expvalues(cb, "X(2)")
-21-element Vector{ComplexF64}:
-                     0.0 + 0.0im
-   -1.617576049847552e-6 + 6.617439891157473e-23im
-   -2.216802827443102e-6 - 2.602082008249062e-18im
-  -2.1754485086580383e-5 + 5.293471330973909e-22im
-    4.696594721193055e-5 + 6.511993073259912e-21im
-   -6.763856924121541e-5 + 3.4410971976147374e-21im
-   -3.686889866871368e-5 - 3.599741391814458e-21im
-[...]
+6-element Vector{ComplexF64}:
+                    0.0 + 0.0im
+  -1.617576049847552e-6 + 6.617439891157473e-23im
+  -2.216802827443102e-6 - 2.602082008249062e-18im
+ -2.1754485086580383e-5 + 5.293471330973909e-22im
+   4.696594721193055e-5 + 6.511993073259912e-21im
+  -6.763856924121541e-5 + 3.4410971976147374e-21im
 
 ```
 
@@ -206,16 +194,14 @@ Finally, we can access the time series relative to the state norm (which is the
 actual 2-norm of the state, the trace, or another relevant quantity depending on
 the chosen time-evolution algorithm).
 
-```julia-repl
+```jldoctest callback_obj
 julia> measurements_norm(cb)
-21-element Vector{ComplexF64}:
+6-element Vector{ComplexF64}:
                 1.0 + 0.0im
  1.0000000000000262 + 0.0im
  1.0000000000000322 + 0.0im
  1.0000000000000813 + 0.0im
  1.0000000000001033 + 0.0im
  1.0000000000001088 + 0.0im
- 1.0000000000001144 + 0.0im
-[...]
 
 ```
