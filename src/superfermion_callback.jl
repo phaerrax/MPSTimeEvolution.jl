@@ -20,29 +20,47 @@ end
 
 """
     SuperfermionCallback(
-        operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
+        operators, sites::Vector{<:Index}, measure_timestep::Float64
     )
 
-Construct a `SuperfermionCallback` providing an array `operators` of `LocalOperator` objects
-representing operators associated to specific sites. Each of them will be measured
+Construct a `SuperfermionCallback` providing some `operators` and a list of ITensor `sites`.
+The `operator` variable can be either a vector of `LocalOperator` objects, or a string (see
+`parseoperators` for instructions on the allowed syntax).  Each operator will be measured
 on the given site during every step of the time evolution, and the results recorded inside
 the `SuperfermionCallback` object as an `ExpValueSeries` for later analysis. The array
 `sites` is the same basis of sites used to define the MPS and MPO for the calculations.
 
-This struct is actually defined the same say as [`ExpValueCallback`](@ref), but it allows
-using Julia's multiple dispatch features to choose the correct method to measure expectation
+This struct is defined the same say as [`ExpValueCallback`](@ref), but it allows using
+Julia's multiple dispatch features to choose the correct method to measure expectation
 values.
 """
+function SuperfermionCallback end
+
 function SuperfermionCallback(
     operators::Vector{LocalOperator}, sites::Vector{<:Index}, measure_timestep::Float64
 )
     return SuperfermionCallback(
         operators,
         sites,
-        Dict(o => ExpValueSeries() for o in operators),
-        ExpValueSeries(),
+        Dict(x => ExpValueSeries() for x in operators),
         # A single ExpValueSeries for each operator in the list.
-        Vector{Float64}(),
+        ExpValueSeries(),  # for the norm, or the trace
+        Vector{Float64}(),  # time instants of measurement steps
+        measure_timestep,
+    )
+end
+
+function SuperfermionCallback(
+    operators::AbstractString, sites::Vector{<:Index}, measure_timestep::Float64
+)
+    localops = parseoperators(operators)
+    return SuperfermionCallback(
+        localops,
+        sites,
+        Dict(x => ExpValueSeries() for x in localops),
+        # A single ExpValueSeries for each operator in the list.
+        ExpValueSeries(),  # for the norm, or the trace
+        Vector{Float64}(),  # time instants of measurement steps
         measure_timestep,
     )
 end
