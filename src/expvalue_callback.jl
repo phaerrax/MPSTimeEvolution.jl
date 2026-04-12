@@ -66,7 +66,7 @@ measurements_norm(cb::ExpValueCallback) = cb.norm
 ops(cb::ExpValueCallback) = cb.operators
 sites(cb::ExpValueCallback) = cb.sites
 
-expvalues(cb::ExpValueCallback) = cb.measurements
+expvalues(cb::ExpValueCallback) = sort(cb.measurements)
 expvalues(cb::ExpValueCallback, lop::LocalOperator) = cb.measurements[lop]
 expvalues(cb::ExpValueCallback, name::AbstractString) = expvalues(cb, LocalOperator(name))
 

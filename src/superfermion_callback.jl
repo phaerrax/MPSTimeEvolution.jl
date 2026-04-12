@@ -72,7 +72,7 @@ callback_dt(cb::SuperfermionCallback) = cb.measure_timestep
 ops(cb::SuperfermionCallback) = cb.operators
 sites(cb::SuperfermionCallback) = cb.sites
 
-expvalues(cb::SuperfermionCallback) = cb.measurements
+expvalues(cb::SuperfermionCallback) = sort(cb.measurements)
 expvalues(cb::SuperfermionCallback, lop::LocalOperator) = cb.measurements[lop]
 function expvalues(cb::SuperfermionCallback, name::AbstractString)
     expvalues(cb, LocalOperator(name))
