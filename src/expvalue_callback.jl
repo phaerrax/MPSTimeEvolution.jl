@@ -75,7 +75,7 @@ function Base.show(io::IO, cb::ExpValueCallback)
     # Print the list of operators
     println(io, "Operators: ", join(name.(ops(cb)), ", ", " and "))
     if !isempty(measurement_ts(cb))
-        println(
+        print(
             io,
             "Measured times:",
             "\n  from ",
@@ -86,7 +86,7 @@ function Base.show(io::IO, cb::ExpValueCallback)
             callback_dt(cb),
         )
     else
-        println(io, "No measurements performed")
+        print(io, "No measurements performed")
     end
 end
 

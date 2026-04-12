@@ -24,7 +24,7 @@ the description, so that for example `LocalOperator(Dict(1 => "Sx"))` represents
 the `"Sx"` operator on the first site no matter how many sites there are in the
 system.  Here are more practical examples:
 
-* \\(S\sb{x} \id \otimes \id\\)
+* \\(S_x \otimes \id \otimes \id\\)
 * \\(\id \otimes A \otimes \id \otimes \adj{A} \otimes \id\\)
 * \\(Z \otimes Z \otimes Z \otimes Z\\)
 

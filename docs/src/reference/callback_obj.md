@@ -146,7 +146,6 @@ Measured times:
   to 9.99999999999998
   each 1.0
 
-
 ```
 
 The computed expectation values can be accessed by calling the `expvalues`
