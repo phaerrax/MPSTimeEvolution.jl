@@ -43,16 +43,17 @@ just as in the tutorial for the unitary TDVP1 algorithm.
 !!! tip "Unitary part of the GKSL equation"
     LindbladVectorizedTensors provides some utility functions that allow us
     to create the \\(-\iu[H,\blank]\\) part of the GKSL equation easily: the
-    `gkslcommutator` takes a list of strings and integers `s1, n1, s2, n2, ...` 
+    `gkslcommutator` takes a list of strings and integers `s1, n1, s2, n2, ...`
     and returns an OpSum object representing \\(-\iu[S,\blank]\\) where \\(S\\)
     is the product of each `sk` on site `nk`.
-    
+
     ```jldoctest; setup = :(using LindbladVectorizedTensors)
     julia> gkslcommutator("A", 1, "B", 3)
     sum(
       0.0 - 1.0im A⋅(1,) B⋅(3,)
       0.0 + 1.0im ⋅A(1,) ⋅B(3,)
     )
+
     ```
 
     In this notation, `A⋅` is an operator that multiplies by `A` on the left,
@@ -74,6 +75,7 @@ julia> for n in 1:N
 julia> for n in 1:N-1
            ℓ += -0.5 * gkslcommutator("σz", n, "σz", n+1)
        end
+
 ```
 
 Here the strings `"↑"` and `"↓"` define pure states in the up and down spin
@@ -96,6 +98,7 @@ julia> for n in [1,N]
            ℓ += -0.5, "σ+⋅ * σ-⋅", n
            ℓ += -0.5, "⋅σ- * ⋅σ+", n
        end
+
 ```
 
 (Note the inverted order in `ℓ += 0.5, "σ-⋅ * σ+⋅", n` with respect to the
@@ -106,12 +109,14 @@ Finally we construct the MPO:
 
 ```jldoctest tdvp1vec
 julia> L = MPO(ℓ, s);
+
 ```
 
 We set the time step and the total evolution time to
 
 ```jldoctest tdvp1vec
 julia> dt = 0.1; tmax = 1;
+
 ```
 
 and we define a callback object to track the \\(z\\)-axis magnetisation on the
@@ -122,6 +127,7 @@ julia> cb = ExpValueCallback("Sz(1,2,3)", s, dt)
 ExpValueCallback
 Operators: Sz(1), Sz(2) and Sz(3)
 No measurements performed
+
 ```
 
 For the other keyword arguments, the default value is already enough. Note that
@@ -147,17 +153,19 @@ here `hermitian=false` by default, which is what we want.
 Let's assign some temporary files to the output arguments:
 
 ```jldoctest tdvp1vec
-julia> meas_file = mktemp();
+julia> meas_file, _ = mktemp();
 
-julia> bdim_file = mktemp();
+julia> bdim_file, _ = mktemp();
 
-julia> time_file = mktemp();
+julia> time_file, _ = mktemp();
+
 ```
 
 and finally start the evolution, by calling the `tdvp1vec!` method.
 
 ```jldoctest tdvp1vec
 julia> tdvp1vec!(ρₜ, L, dt, tmax; callback=cb, io_file=meas_file, io_ranks=bdim_file, io_times=time_file, progress=false);
+
 ```
 
 The output files look like the ones in [Standard TDVP1](@ref): `meas_file` is

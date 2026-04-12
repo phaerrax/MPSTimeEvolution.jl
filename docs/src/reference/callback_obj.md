@@ -96,12 +96,14 @@ creating it is very simple. For example, let's consider the operator
 julia> using ITensors
 
 julia> ITensors.op(::OpName"X", ::SiteType"Boson", s::Index) = 1/sqrt(2) * op("a† + a", s)
+
 ```
 
 Now we can use it in our callback by adding it to the list, for example:
 
 ```jldoctest callback_obj
 julia> cb = ExpValueCallback("N(1,2,3,4),X(1,2,3,4)", sites, 10dt);
+
 ```
 
 ### Results readout
@@ -141,7 +143,7 @@ ExpValueCallback
 Operators: N(1), N(2), N(3), N(4), X(1), X(2), X(3) and X(4)
 Measured times:
   from 0.0
-  to 4.999999999999998
+  to 9.99999999999998
   each 1.0
 
 
@@ -153,15 +155,15 @@ assigned the series of its expectation values.
 
 ```jldoctest callback_obj
 julia> expvalues(cb)
-Dict{LocalOperator, Vector{ComplexF64}} with 8 entries:
-  N(2) => [0.0+0.0im, 0.497967+0.0im, 0.132586+0.0im, 0.0262118+0.0im, 0.003191…
-  X(3) => [0.0+0.0im, -1.14256e-6+3.43722e-22im, -2.63261e-5-4.06683e-20im, -2.…
-  X(4) => [0.0+0.0im, 4.27215e-5-2.05802e-21im, 0.000124825-1.03762e-20im, 5.01…
-  X(2) => [0.0+0.0im, -1.61758e-6+6.61744e-23im, -2.2168e-6-2.60208e-18im, -2.1…
-  X(1) => [0.0+0.0im, -1.13453e-6-4.60006e-23im, -3.93457e-6-2.03123e-22im, -2.…
+OrderedCollections.OrderedDict{LocalOperator, Vector{ComplexF64}} with 8 entries:
   N(1) => [1.0+0.0im, 0.332612+0.0im, 0.00109072+0.0im, 0.00850228+0.0im, 0.003…
+  X(1) => [0.0+0.0im, -1.13453e-6-4.60006e-23im, -3.93457e-6-2.03123e-22im, -2.…
+  N(2) => [0.0+0.0im, 0.497967+0.0im, 0.132586+0.0im, 0.0262118+0.0im, 0.003191…
+  X(2) => [0.0+0.0im, -1.61758e-6+6.61744e-23im, -2.2168e-6-2.60208e-18im, -2.1…
   N(3) => [0.0+0.0im, 0.149637+0.0im, 0.416359+0.0im, 0.0131695+0.0im, 0.047656…
+  X(3) => [0.0+0.0im, -1.14256e-6+3.43722e-22im, -2.63261e-5-4.06683e-20im, -2.…
   N(4) => [0.0+0.0im, 0.0184514+0.0im, 0.316095+0.0im, 0.227534+0.0im, 0.011087…
+  X(4) => [0.0+0.0im, 4.27215e-5-2.05802e-21im, 0.000124825-1.03762e-20im, 5.01…
 
 ```
 
@@ -171,22 +173,32 @@ single `LocalOperator`.
 
 ```jldoctest callback_obj
 julia> expvalues(cb, LocalOperator(3 => "N"))
-6-element Vector{ComplexF64}:
+11-element Vector{ComplexF64}:
                    0.0 + 0.0im
     0.1496371087008667 + 0.0im
     0.4163587833281586 + 0.0im
   0.013169546650199981 + 0.0im
   0.047656092490155594 + 0.0im
  0.0012094869867415171 + 0.0im
+  0.009031865524793884 + 0.0im
+  0.008905435038874998 + 0.0im
+  0.010261216883988691 + 0.0im
+  0.032619559874800697 + 0.0im
+   0.22093690525361828 + 0.0im
 
 julia> expvalues(cb, "X(2)")
-6-element Vector{ComplexF64}:
-                    0.0 + 0.0im
-  -1.617576049847552e-6 + 6.617439891157473e-23im
-  -2.216802827443102e-6 - 2.602082008249062e-18im
- -2.1754485086580383e-5 + 5.293471330973909e-22im
-   4.696594721193055e-5 + 6.511993073259912e-21im
-  -6.763856924121541e-5 + 3.4410971976147374e-21im
+11-element Vector{ComplexF64}:
+                     0.0 + 0.0im
+   -1.617576049847552e-6 + 6.617439891157473e-23im
+   -2.216802827443102e-6 - 2.602082008249062e-18im
+  -2.1754485086580383e-5 + 5.293471330973909e-22im
+    4.696594721193055e-5 + 6.511993073259912e-21im
+   -6.763856924121541e-5 + 3.4410971976147374e-21im
+   -3.686889866871368e-5 - 3.599741391814458e-21im
+    2.176614750375809e-5 + 2.6487551060169705e-22im
+   -6.419493464380101e-5 - 2.8434333556510326e-25im
+ -0.00010698407746021099 + 6.775843525379591e-21im
+    4.065995056214414e-5 + 6.776282561183226e-21im
 
 ```
 
@@ -196,12 +208,17 @@ the chosen time-evolution algorithm).
 
 ```jldoctest callback_obj
 julia> measurements_norm(cb)
-6-element Vector{ComplexF64}:
+11-element Vector{ComplexF64}:
                 1.0 + 0.0im
  1.0000000000000262 + 0.0im
  1.0000000000000322 + 0.0im
  1.0000000000000813 + 0.0im
  1.0000000000001033 + 0.0im
  1.0000000000001088 + 0.0im
+ 1.0000000000001144 + 0.0im
+ 1.0000000000001192 + 0.0im
+  1.000000000000159 + 0.0im
+ 1.0000000000001599 + 0.0im
+ 1.0000000000001545 + 0.0im
 
 ```
