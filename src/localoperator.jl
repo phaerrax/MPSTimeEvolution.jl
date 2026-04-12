@@ -5,7 +5,7 @@ export LocalOperator, parseoperators
 
 A LocalOperator represents a product of local operators, whose names (strings, as recognized
 by ITensors) are specified by `factors` and acting on sites which are not necessarily
-consecutive. For example, the operator ``id ⊗ A ⊗ id ⊗ C`` would be represented as
+consecutive. For example, the operator ``1 ⊗ A ⊗ 1 ⊗ C`` would be represented as
 `{2 => "A", 4 => "C"}`.
 """
 struct LocalOperator
