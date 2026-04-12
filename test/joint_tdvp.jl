@@ -31,8 +31,8 @@ function siam_tdvp1_with_phase(; phase, dt, tmax, N)
 
     f = CSV.File(tmpfile)
     return f["time"],
-    exp(-im * phase) .* complex.(f["N{1}_re"], f["N{1}_im"]),
-    exp(-im * phase) .* complex.(f["N{5}_re"], f["N{5}_im"])
+    exp(-im * phase) .* complex.(f["N(1)_re"], f["N(1)_im"]),
+    exp(-im * phase) .* complex.(f["N(5)_re"], f["N(5)_im"])
 end
 
 function siam_jointtdvp1_with_phase(; phase, dt, tmax, N)
@@ -69,8 +69,8 @@ function siam_jointtdvp1_with_phase(; phase, dt, tmax, N)
 
     f = CSV.File(tmpfile)
     return f["time"],
-    complex.(f["N{1}_re"], f["N{1}_im"]),
-    complex.(f["N{5}_re"], f["N{5}_im"])
+    complex.(f["N(1)_re"], f["N(1)_im"]),
+    complex.(f["N(5)_re"], f["N(5)_im"])
 end
 
 # This tests pushes the bond dimension to the maximum admitted by the sizes of the system,

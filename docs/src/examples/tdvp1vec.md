@@ -120,7 +120,7 @@ first three sites:
 ```jldoctest tdvp1vec
 julia> cb = ExpValueCallback("Sz(1,2,3)", s, dt)
 ExpValueCallback
-Operators: Sz{1}, Sz{2} and Sz{3}
+Operators: Sz(1), Sz(2) and Sz(3)
 No measurements performed
 ```
 
@@ -163,7 +163,7 @@ julia> tdvp1vec!(ρₜ, L, dt, tmax; callback=cb, io_file=meas_file, io_ranks=bd
 The output files look like the ones in [Standard TDVP1](@ref): `meas_file` is
 
 ```csv
-time,Sz{1}_re,Sz{1}_im,Sz{2}_re,Sz{2}_im,Sz{3}_re,Sz{3}_im,Norm_re,Norm_im
+time,Sz(1)_re,Sz(1)_im,Sz(2)_re,Sz(2)_im,Sz(3)_re,Sz(3)_im,Norm_re,Norm_im
 0.0,0.4999999999999991,0.0,-0.499999999999999,0.0,0.499999999999999,0.0,0.9999999999999978,0.0
 0.1,0.39598707437112335,6.0527724732136165e-19,-0.490065811967275,-1.353844415229414e-19,0.49006599630691594,-4.7762507132213846e-20,0.9999999999999987,1.4812772427663158e-18
 0.2,0.2877548464126332,1.4009187515124302e-18,-0.4610129673309902,-3.39292416943428e-18,0.4610293716309977,4.1677181825687184e-19,0.9999999999999984,4.366378241259551e-18

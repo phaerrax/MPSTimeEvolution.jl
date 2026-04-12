@@ -55,20 +55,20 @@ julia> N = 10; sites = siteinds("Boson", N; dim=3);
 
 julia> list = LocalOperator.([n => "N" for n in 1:N])
 10-element Vector{LocalOperator}:
- N{1}
- N{2}
- N{3}
- N{4}
- N{5}
- N{6}
- N{7}
- N{8}
- N{9}
- N{10}
+ N(1)
+ N(2)
+ N(3)
+ N(4)
+ N(5)
+ N(6)
+ N(7)
+ N(8)
+ N(9)
+ N(10)
 
 julia> cb = ExpValueCallback(list, sites, 10dt)
 ExpValueCallback
-Operators: N{1}, N{2}, N{3}, N{4}, N{5}, N{6}, N{7}, N{8}, N{9} and N{10}
+Operators: N(1), N(2), N(3), N(4), N(5), N(6), N(7), N(8), N(9) and N(10)
 No measurements performed
 
 ```
@@ -80,7 +80,7 @@ the average occupation number on the first four sites, we would write
 ```jldoctest callback_obj
 julia> cb = ExpValueCallback("N(1,2,3,4)", sites, 10dt)
 ExpValueCallback
-Operators: N{1}, N{2}, N{3} and N{4}
+Operators: N(1), N(2), N(3) and N(4)
 No measurements performed
 
 ```
@@ -138,7 +138,7 @@ By invoking `cb` we can see that there is new information:
 ```jldoctest callback_obj
 julia> cb
 ExpValueCallback
-Operators: N{1}, N{2}, N{3}, N{4}, X{1}, X{2}, X{3} and X{4}
+Operators: N(1), N(2), N(3), N(4), X(1), X(2), X(3) and X(4)
 Measured times:
   from 0.0
   to 4.999999999999998
@@ -154,14 +154,14 @@ assigned the series of its expectation values.
 ```jldoctest callback_obj
 julia> expvalues(cb)
 Dict{LocalOperator, Vector{ComplexF64}} with 8 entries:
-  N{2} => [0.0+0.0im, 0.497967+0.0im, 0.132586+0.0im, 0.0262118+0.0im, 0.003191…
-  X{3} => [0.0+0.0im, -1.14256e-6+3.43722e-22im, -2.63261e-5-4.06683e-20im, -2.…
-  X{4} => [0.0+0.0im, 4.27215e-5-2.05802e-21im, 0.000124825-1.03762e-20im, 5.01…
-  X{2} => [0.0+0.0im, -1.61758e-6+6.61744e-23im, -2.2168e-6-2.60208e-18im, -2.1…
-  X{1} => [0.0+0.0im, -1.13453e-6-4.60006e-23im, -3.93457e-6-2.03123e-22im, -2.…
-  N{1} => [1.0+0.0im, 0.332612+0.0im, 0.00109072+0.0im, 0.00850228+0.0im, 0.003…
-  N{3} => [0.0+0.0im, 0.149637+0.0im, 0.416359+0.0im, 0.0131695+0.0im, 0.047656…
-  N{4} => [0.0+0.0im, 0.0184514+0.0im, 0.316095+0.0im, 0.227534+0.0im, 0.011087…
+  N(2) => [0.0+0.0im, 0.497967+0.0im, 0.132586+0.0im, 0.0262118+0.0im, 0.003191…
+  X(3) => [0.0+0.0im, -1.14256e-6+3.43722e-22im, -2.63261e-5-4.06683e-20im, -2.…
+  X(4) => [0.0+0.0im, 4.27215e-5-2.05802e-21im, 0.000124825-1.03762e-20im, 5.01…
+  X(2) => [0.0+0.0im, -1.61758e-6+6.61744e-23im, -2.2168e-6-2.60208e-18im, -2.1…
+  X(1) => [0.0+0.0im, -1.13453e-6-4.60006e-23im, -3.93457e-6-2.03123e-22im, -2.…
+  N(1) => [1.0+0.0im, 0.332612+0.0im, 0.00109072+0.0im, 0.00850228+0.0im, 0.003…
+  N(3) => [0.0+0.0im, 0.149637+0.0im, 0.416359+0.0im, 0.0131695+0.0im, 0.047656…
+  N(4) => [0.0+0.0im, 0.0184514+0.0im, 0.316095+0.0im, 0.227534+0.0im, 0.011087…
 
 ```
 

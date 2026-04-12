@@ -23,7 +23,7 @@ domain(op::LocalOperator) = collect(keys(op.terms))
 connecteddomain(op::LocalOperator) = first(domain(op)):last(domain(op))
 # Since LocalOperator structs are dictionaries sorted by their keys, `domain` and
 # `connecteddomain` are guaranteed to return sorted lists of numbers.
-name(op::LocalOperator) = *(["$val{$key}" for (key, val) in op.terms]...)
+name(op::LocalOperator) = reduce(*, "$val($key)" for (key, val) in op.terms)
 
 # Sorting utilities
 Base.:(==)(a::LocalOperator, b::LocalOperator) = (a.terms == b.terms)
@@ -99,11 +99,11 @@ Parse the string `s` as a list of `LocalOperator` objects, with the following ru
 ```julia-repl
 julia> parseoperators("x(1)y(3),y(4),z(1,2,3)")
 5-element Vector{LocalOperator}:
- x{1}y{3}
- y{4}
- z{1}
- z{2}
- z{3}
+ x(1)y(3)
+ y(4)
+ z(1)
+ z(2)
+ z(3)
 ```
 """
 function parseoperators(s::AbstractString)

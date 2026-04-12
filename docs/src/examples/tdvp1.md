@@ -1,8 +1,10 @@
 # Standard TDVP1
 
-Let's see how this package works by looking at the ordinary TDVP1 method,
-that is, the time-evolution algorithm for the Schrödinger equation.
-This is the algorithm described for example in [Lubich2015:tdvp_evolution,Haegeman2016:unifying_time_evolution_optimization_mps](@cite) and [Paeckel2019:time_evolution_methods](@cite).
+Let's see how this package works by looking at the ordinary TDVP1 method, that
+is, the time-evolution algorithm for the Schrödinger equation.  This is the
+algorithm described for example in
+[Lubich2015:tdvp_evolution,Haegeman2016:unifying_time_evolution_optimization_mps](@cite)
+and [Paeckel2019:time_evolution_methods](@cite).
 
 ```@docs; canonical=false, collapsed=true
 tdvp1!
@@ -18,8 +20,8 @@ H = -\frac12 \sum_{n=1}^{N-1} \pauliz[n] \pauliz[n+1] +\sum_{n=1}^{N} \paulix[n]
 starting with a state with alternating magnetisation,
 
 ```math
-\ket{\psi_0} = \ket{\spinup} \otimes \ket{\spindown} \otimes \ket{\spinup} \otimes \ket{\spindown} \otimes \dotsb {}
-```
+\ket{\psi_0} = \ket{\spinup} \otimes \ket{\spindown} \otimes \ket{\spinup}
+\otimes \ket{\spindown} \otimes \dotsb {} ```
 
 Let's review what we need to set up in order to use the `tdvp1!` method.  First
 of all, we define the state and Hamiltonian objects in Julia, with ITensor.
@@ -62,7 +64,7 @@ three sites.
 ```jldoctest tdvp1
 julia> cb = ExpValueCallback("Sz(1,2,3)", s, dt)
 ExpValueCallback
-Operators: Sz{1}, Sz{2} and Sz{3}
+Operators: Sz(1), Sz(2) and Sz(3)
 No measurements performed
 ```
 
@@ -121,7 +123,7 @@ with the progress bar and updated with every step.
 Here is how the output file `meas_file` looks:
 
 ```csv
-time,Sz{1}_re,Sz{1}_im,Sz{2}_re,Sz{2}_im,Sz{3}_re,Sz{3}_im,Norm_re,Norm_im
+time,Sz(1)_re,Sz(1)_im,Sz(2)_re,Sz(2)_im,Sz(3)_re,Sz(3)_im,Norm_re,Norm_im
 0.0,0.5,0.0,-0.5,0.0,0.5,0.0,1.0,0.0
 0.1,0.4900414332914067,5.3791631483433606e-18,-0.4900659962056321,-1.377536144717721e-20,0.49006599630768083,-1.6417627115633278e-20,0.9999999999999994,0.0
 0.2,0.4606555451703479,-8.146889331862475e-18,-0.46102931085129484,-7.089461369668159e-20,0.4610293732495007,4.612226493880881e-20,1.0000000000000002,0.0
