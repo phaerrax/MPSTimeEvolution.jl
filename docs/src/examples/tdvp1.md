@@ -21,7 +21,8 @@ starting with a state with alternating magnetisation,
 
 ```math
 \ket{\psi_0} = \ket{\spinup} \otimes \ket{\spindown} \otimes \ket{\spinup}
-\otimes \ket{\spindown} \otimes \dotsb {} ```
+\otimes \ket{\spindown} \otimes \dotsb {}
+```
 
 Let's review what we need to set up in order to use the `tdvp1!` method.  First
 of all, we define the state and Hamiltonian objects in Julia, with ITensor.
@@ -68,7 +69,6 @@ julia> cb = ExpValueCallback("Sz(1,2,3)", s, dt)
 ExpValueCallback
 Operators: Sz(1), Sz(2) and Sz(3)
 No measurements performed
-
 
 ```
 

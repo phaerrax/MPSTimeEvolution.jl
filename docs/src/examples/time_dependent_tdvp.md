@@ -94,9 +94,7 @@ julia> function time_dependent_exp(
        )
            ψₜ, info = exponentiate(H(current_time), time_step, ψ₀; kwargs...)
            return ψₜ, info
-       end
-time_dependent_exp (generic function with 1 method)
-
+       end;
 ```
 
 The first argument `TimeDependentSum` is a struct, defined in `ITensorMPS` (but
@@ -124,9 +122,7 @@ julia> function time_dependent_solver(PHs::ProjMPOSum, time_step, ψ₀; kwargs.
            return time_dependent_exp(
                TimeDependentSum(fs, PHs), time_step, ψ₀; ishermitian=true, kwargs...
            )
-       end
-time_dependent_solver (generic function with 1 method)
-
+       end;
 ```
 
 This function will be used inside `tdvp1!`, precisely in the `tdvp_site_update!`
@@ -152,7 +148,10 @@ Now we set the variables related to time, and the callback operator:
 ```jldoctest time_dependent_tdvp
 julia> dt = 0.01; tmax = 2T;
 
-julia> cb = ExpValueCallback("Nup(1,5),Ndn(1,5)", s, dt);
+julia> cb = ExpValueCallback("Nup(1,5),Ndn(1,5)", s, dt)
+ExpValueCallback
+Operators: Nup(1), Nup(5), Ndn(1) and Ndn(5)
+No measurements performed
 ```
 
 One last thing: during the execution of `time_dependent_exp`, inside the stack

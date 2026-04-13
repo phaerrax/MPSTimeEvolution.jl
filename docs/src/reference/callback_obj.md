@@ -102,7 +102,10 @@ julia> ITensors.op(::OpName"X", ::SiteType"Boson", s::Index) = 1/sqrt(2) * op("a
 Now we can use it in our callback by adding it to the list, for example:
 
 ```jldoctest callback_obj
-julia> cb = ExpValueCallback("N(1,2,3,4),X(1,2,3,4)", sites, 10dt);
+julia> cb = ExpValueCallback("N(1,2,3,4),X(1,2,3,4)", sites, 10dt)
+ExpValueCallback
+Operators: N(1), N(2), N(3), N(4), X(1), X(2), X(3) and X(4)
+No measurements performed
 
 ```
 
@@ -114,7 +117,7 @@ the `"N(1,2,3,4),X(1,2,3,4)"` operators.
 Let's set up a Hamiltonian operator and run a quick simulation with TDVP1 (see
 the [TDVP1 tutorial](@ref "Standard TDVP1")):
 
-```jldoctest callback_obj
+```jldoctest callback_obj; filter = r"id=\d+" => "id=###"
 julia> v = MPS(sites, n -> n == 1 ? "1" : "0");
 
 julia> v = enlargelinks(v, 4);
@@ -137,7 +140,7 @@ julia> tdvp1!(v, H, dt, 10; callback=cb, progress=false);
 
 By invoking `cb` we can see that there is new information:
 
-```jldoctest callback_obj
+```jldoctest callback_obj; filter = [r"9.99\d+" => "10.0", r"0.99\d+" => "1.0"]
 julia> cb
 ExpValueCallback
 Operators: N(1), N(2), N(3), N(4), X(1), X(2), X(3) and X(4)
@@ -152,17 +155,17 @@ The computed expectation values can be accessed by calling the `expvalues`
 method on the callback: the result is a dictionary where each local operator is
 assigned the series of its expectation values.
 
-```jldoctest callback_obj
+```jldoctest callback_obj; filter = r"\[\d\.0\+0\.0im, .*" => "[#.0+0.0im, ###"
 julia> expvalues(cb)
 OrderedCollections.OrderedDict{LocalOperator, Vector{ComplexF64}} with 8 entries:
-  N(1) => [1.0+0.0im, 0.332612+0.0im, 0.00109072+0.0im, 0.00850228+0.0im, 0.003…
-  X(1) => [0.0+0.0im, -1.13453e-6-4.60006e-23im, -3.93457e-6-2.03123e-22im, -2.…
-  N(2) => [0.0+0.0im, 0.497967+0.0im, 0.132586+0.0im, 0.0262118+0.0im, 0.003191…
-  X(2) => [0.0+0.0im, -1.61758e-6+6.61744e-23im, -2.2168e-6-2.60208e-18im, -2.1…
-  N(3) => [0.0+0.0im, 0.149637+0.0im, 0.416359+0.0im, 0.0131695+0.0im, 0.047656…
-  X(3) => [0.0+0.0im, -1.14256e-6+3.43722e-22im, -2.63261e-5-4.06683e-20im, -2.…
-  N(4) => [0.0+0.0im, 0.0184514+0.0im, 0.316095+0.0im, 0.227534+0.0im, 0.011087…
-  X(4) => [0.0+0.0im, 4.27215e-5-2.05802e-21im, 0.000124825-1.03762e-20im, 5.01…
+  N(1) => [1.0+0.0im, 0.332612+0.0im, 0.00109051+0.0im, 0.0085059+0.0im, 0.0034…
+  X(1) => [0.0+0.0im, -4.93851e-9-1.55657e-24im, 1.54546e-7-6.4159e-24im, 1.083…
+  N(2) => [0.0+0.0im, 0.497967-2.52076e-23im, 0.132589-7.85081e-19im, 0.0262158…
+  X(2) => [0.0+0.0im, -1.73335e-9-1.0679e-23im, 6.49531e-7+1.56158e-20im, 2.344…
+  N(3) => [0.0+0.0im, 0.149637-2.63998e-23im, 0.416356-2.54984e-23im, 0.0131673…
+  X(3) => [0.0+0.0im, -3.70391e-7+4.54031e-23im, -3.44816e-7-9.89546e-22im, 3.5…
+  N(4) => [0.0+0.0im, 0.0184914+7.90412e-20im, 0.316137-1.95008e-18im, 0.227405…
+  X(4) => [0.0+0.0im, -4.55872e-6+1.36907e-23im, 6.11274e-6-1.46214e-22im, 8.46…
 
 ```
 
@@ -170,7 +173,7 @@ The time series for individual operators can be accessed via the `expvalues(cb,
 lop)` syntax, where `lop` is either a `LocalOperator` or a string that defines a
 single `LocalOperator`.
 
-```jldoctest callback_obj
+```jldoctest callback_obj; filter = r"^(\s+)?[-+]?([0-9]*[.])?[0-9]+([eE][-+]?\d+)? [-+] [-+]?([0-9]*[.])?[0-9]+([eE][-+]?\d+)?im"m => "### + ###im"
 julia> expvalues(cb, LocalOperator(3 => "N"))
 11-element Vector{ComplexF64}:
                    0.0 + 0.0im
@@ -205,7 +208,7 @@ Finally, we can access the time series relative to the state norm (which is the
 actual 2-norm of the state, the trace, or another relevant quantity depending on
 the chosen time-evolution algorithm).
 
-```jldoctest callback_obj
+```jldoctest callback_obj; filter = r"^(\s+)?[-+]?([0-9]*[.])?[0-9]+([eE][-+]?\d+)? [-+] [-+]?([0-9]*[.])?[0-9]+([eE][-+]?\d+)?im"m => "### + ###im"
 julia> measurements_norm(cb)
 11-element Vector{ComplexF64}:
                 1.0 + 0.0im
