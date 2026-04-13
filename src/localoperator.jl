@@ -123,7 +123,7 @@ function parseoperators(s::AbstractString)
         end
         # Decide whether we have a product of operators, such as x(1)y(2), or a
         # sequence such as x(1,2,3)
-        d = Dict()
+        d = Dict{Int,String}()
         foreach(
             re -> push!(d, parse(Int, re["site"]) => re["name"]),
             eachmatch(r"(?<name>\w+?)\((?<site>\d+?)\)", opstrings[i]),
