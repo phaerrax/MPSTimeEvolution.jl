@@ -10,15 +10,15 @@ requirejs.config({
     'highlight-julia-repl': 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/julia-repl.min',
   },
   shim: {
-  "highlight-julia": {
-    "deps": [
-      "highlight"
-    ]
-  },
   "headroom-jquery": {
     "deps": [
       "jquery",
       "headroom"
+    ]
+  },
+  "highlight-julia": {
+    "deps": [
+      "highlight"
     ]
   },
   "highlight-julia-repl": {
@@ -30,14 +30,11 @@ requirejs.config({
 ////////////////////////////////////////////////////////////////////////////////
 require([], function() {
 window.MathJax = {
+  "options": {
+    "ignoreHtmlClass": "tex2jax_ignore",
+    "processHtmlClass": "tex2jax_process"
+  },
   "tex": {
-    "packages": [
-      "base",
-      "ams",
-      "autoload",
-      "configmacros",
-      "mathtools"
-    ],
     "inlineMath": [
       [
         "$",
@@ -49,31 +46,106 @@ window.MathJax = {
       ]
     ],
     "macros": {
-      "ket": [
-        "\\lvert #1 \\rangle",
-        1
+      "C": [
+        "\\mathbb{C}"
       ],
       "Im": [
         "\\mathrm{Im}"
       ],
+      "N": [
+        "\\mathbb{N}"
+      ],
+      "Num": [
+        "\\mathscr{N}"
+      ],
+      "R": [
+        "\\mathbb{R}"
+      ],
       "Re": [
         "\\mathrm{Re}"
       ],
-      "innp": [
-        "\\langle #1, #2\\rangle",
-        2
+      "abs": [
+        "\\lvert #1 \\rvert",
+        1
+      ],
+      "adj": [
+        "#1^\\dagger",
+        1
+      ],
+      "avg": [
+        "\\langle #1\\rangle",
+        1
+      ],
+      "blank": [
+        "{-}"
+      ],
+      "bra": [
+        "\\langle #1 \\rvert",
+        1
+      ],
+      "conj": [
+        "\\bar{#1}",
+        1
+      ],
+      "dd": [
+        "\\mathrm{d}"
+      ],
+      "defeq": [
+        "\\mathrel{\\mathop:}="
+      ],
+      "det": [
+        "\\operatorname{det}"
+      ],
+      "diag": [
+        "\\operatorname{diag}"
+      ],
+      "dissipator": [
+        "\\mathscr{D}"
       ],
       "fcomm": [
         "\\{#1\\}",
         1
+      ],
+      "id": [
+        "1"
+      ],
+      "imag": [
+        "_{\\mathrm{i}}"
       ],
       "imat": [
         "I_{#1}",
         1,
         ""
       ],
+      "innp": [
+        "\\langle #1, #2\\rangle",
+        2
+      ],
+      "iu": [
+        "\\mathrm{i}"
+      ],
+      "ket": [
+        "\\lvert #1 \\rangle",
+        1
+      ],
+      "lindblad": [
+        "\\mathscr{L}"
+      ],
+      "norm": [
+        "\\lVert #1 \\rVert",
+        1
+      ],
+      "outp": [
+        "\\lvert #1\\rangle \\langle #2\\rvert",
+        2
+      ],
       "paulim": [
         "\\sigma_-^{(#1)}",
+        1,
+        ""
+      ],
+      "paulip": [
+        "\\sigma_+^{(#1)}",
         1,
         ""
       ],
@@ -82,131 +154,59 @@ window.MathJax = {
         1,
         ""
       ],
-      "Num": [
-        "\\mathscr{N}"
-      ],
-      "dd": [
-        "\\mathrm{d}"
-      ],
-      "defeq": [
-        "\\mathrel{\\mathop:}="
-      ],
-      "diag": [
-        "\\operatorname{diag}"
-      ],
-      "sb": [
-        "_{#1}",
-        1
-      ],
-      "tr": [
-        "\\operatorname{tr}"
-      ],
-      "conj": [
-        "\\bar{#1}",
-        1
-      ],
-      "phantomadj": [
-        "^{\\vphantom{\\dagger}}"
-      ],
       "pauliy": [
         "\\sigma_y^{(#1)}",
         1,
         ""
-      ],
-      "bra": [
-        "\\langle #1 \\rvert",
-        1
-      ],
-      "spinup": [
-        "\\uparrow"
       ],
       "pauliz": [
         "\\sigma_z^{(#1)}",
         1,
         ""
       ],
-      "outp": [
-        "\\lvert #1\\rangle \\langle #2\\rvert",
-        2
-      ],
-      "iu": [
-        "\\mathrm{i}"
+      "phantomadj": [
+        "^{\\vphantom{\\dagger}}"
       ],
       "real": [
         "_{\\mathrm{r}}"
       ],
-      "avg": [
-        "\\langle #1\\rangle",
+      "sb": [
+        "_{#1}",
         1
-      ],
-      "abs": [
-        "\\lvert #1 \\rvert",
-        1
-      ],
-      "spindown": [
-        "\\downarrow"
-      ],
-      "N": [
-        "\\mathbb{N}"
-      ],
-      "R": [
-        "\\mathbb{R}"
-      ],
-      "norm": [
-        "\\lVert #1 \\rVert",
-        1
-      ],
-      "blank": [
-        "{-}"
-      ],
-      "dissipator": [
-        "\\mathscr{D}"
-      ],
-      "paulip": [
-        "\\sigma_+^{(#1)}",
-        1,
-        ""
       ],
       "set": [
         "\\{\\, #1 \\;\\vert\\; #2\\,\\}",
         2
       ],
-      "det": [
-        "\\operatorname{det}"
+      "spindown": [
+        "\\downarrow"
       ],
-      "adj": [
-        "#1^\\dagger",
-        1
+      "spinup": [
+        "\\uparrow"
       ],
-      "id": [
-        "1"
-      ],
-      "lindblad": [
-        "\\mathscr{L}"
-      ],
-      "tsp": [
-        "^{\\otimes #1}",
-        1
+      "tr": [
+        "\\operatorname{tr}"
       ],
       "transpose": [
         "#1^{\\mathrm{T}}",
         1
       ],
+      "tsp": [
+        "^{\\otimes #1}",
+        1
+      ],
       "vacuum": [
         "\\varOmega"
-      ],
-      "imag": [
-        "_{\\mathrm{i}}"
-      ],
-      "C": [
-        "\\mathbb{C}"
       ]
     },
+    "packages": [
+      "base",
+      "ams",
+      "autoload",
+      "configmacros",
+      "mathtools"
+    ],
     "tags": "ams"
-  },
-  "options": {
-    "ignoreHtmlClass": "tex2jax_ignore",
-    "processHtmlClass": "tex2jax_process"
   }
 };
 

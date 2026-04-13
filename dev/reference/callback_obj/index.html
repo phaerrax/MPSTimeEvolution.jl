@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Callback objects · MPSTimeEvolution</title><meta name="title" content="Callback objects · MPSTimeEvolution"/><meta property="og:title" content="Callback objects · MPSTimeEvolution"/><meta property="twitter:title" content="Callback objects · MPSTimeEvolution"/><meta name="description" content="Documentation for MPSTimeEvolution."/><meta property="og:description" content="Documentation for MPSTimeEvolution."/><meta property="twitter:description" content="Documentation for MPSTimeEvolution."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">MPSTimeEvolution</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Reference</span><ul><li><a class="tocitem" href="../localoperators/">Local operators</a></li><li class="is-active"><a class="tocitem" href>Callback objects</a><ul class="internal"><li><a class="tocitem" href="#Basic-callback"><span>Basic callback</span></a></li></ul></li><li><a class="tocitem" href="../reference/">Complete reference</a></li></ul></li><li><span class="tocitem">Tutorial</span><ul><li><a class="tocitem" href="../../examples/tdvp1/">Standard TDVP1</a></li><li><a class="tocitem" href="../../examples/tdvp1vec/">Non-unitary TDVP1</a></li><li><a class="tocitem" href="../../examples/time_dependent_tdvp/">Time-dependent TDVP1</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Reference</a></li><li class="is-active"><a href>Callback objects</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Callback objects</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/phaerrax/MPSTimeEvolution.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/phaerrax/MPSTimeEvolution.jl/blob/master/docs/src/reference/callback_obj.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Callback-objects"><a class="docs-heading-anchor" href="#Callback-objects">Callback objects</a><a id="Callback-objects-1"></a><a class="docs-heading-anchor-permalink" href="#Callback-objects" title="Permalink"></a></h1><p>A <em>callback</em> is an object passed to the time-evolution methods, intended to be “called back” after a single step or a sweep of the evolution completes.</p><p>Generally speaking, a callback object describes:</p><ul><li>which operators we are interested in computing expectation values of,</li><li>how frequently we want to calculate them, and</li><li>how we should compute them.</li></ul><p>The first two points are usually handled by the user at the moment of creating the object, while the “how” is already handled by the library, at least for the already defined callbacks.</p><p>More complicated callbacks can be defined: for example, we could define a callback that computes the entanglement entropy relative to a bipartition by computing first the singular values of the MPS over one of its bonds.</p><h2 id="Basic-callback"><a class="docs-heading-anchor" href="#Basic-callback">Basic callback</a><a id="Basic-callback-1"></a><a class="docs-heading-anchor-permalink" href="#Basic-callback" title="Permalink"></a></h2><article><details class="docstring" open="true"><summary id="MPSTimeEvolution.ExpValueCallback-reference-callback_obj"><a class="docstring-binding" href="#MPSTimeEvolution.ExpValueCallback-reference-callback_obj"><code>MPSTimeEvolution.ExpValueCallback</code></a> — <span class="docstring-category">Type</span></summary><section><div><pre><code class="language-julia hljs">ExpValueCallback(
     operators, sites::Vector{&lt;:Index}, measure_timestep::Float64
-)</code></pre><p>Construct an <code>ExpValueCallback</code>, providing some <code>operators</code> and a list of ITensor <code>sites</code>.  The <code>operator</code> variable can be either a vector of <code>LocalOperator</code> objects, or a string (see <code>parseoperators</code> for instructions on the allowed syntax).  Each operator will be measured on the associated sites during every step of the time evolution, and the results recorded inside the <code>ExpValueCallback</code> object as an <code>ExpValueSeries</code> for later analysis. The norm of the state, or the an equivalent quantity (trace, overlap of two sites...) where applicable, will also be computed after each step. The array <code>sites</code> is the same list of sites indices used to define MPSs and MPOs for the calculations.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/phaerrax/MPSTimeEvolution.jl/blob/6cae54863c097caa116bce16263756433fca833b/src/expvalue_callback.jl#L16-L30">source</a></section></details></article><p><code>ExpValueCallback</code> is a basic callback object, already available in this package. It keeps track of the expectation values of a series of operators. To construct this object, we need to provide:</p><ul><li>a list of <code>LocalOperator</code>s,</li><li>the ITensor site indices over which the MPS we evolve is defined,</li><li>the time step for measurements.</li></ul><p>The list of operators can be an actual list of <code>LocalOperator</code> objects, but it can also be a string where <code>LocalOperator</code>s are described more compactly, as explained in <a href="../localoperators/#Local-operators">Local operators</a>. Each operator must be an existing ITensor operator. Note that no check is performed at the moment the callback is created: if the operator does not exist, an error will be thrown during the time evolution, when the callback object attempts to compute its expectation value.</p><h3 id="Example"><a class="docs-heading-anchor" href="#Example">Example</a><a id="Example-1"></a><a class="docs-heading-anchor-permalink" href="#Example" title="Permalink"></a></h3><p>Say we have an MPS <code>v</code> defined on a set of <code>N = 10</code> site indices of the “Boson” site type, and we want to measure the average occupation number on each site. We also want to compute these values not after every time step, but only after ten time steps.  This is how we need to define the callback object.</p><pre><code class="language-julia-repl hljs">julia&gt; using ITensorMPS, MPSTimeEvolution
+)</code></pre><p>Construct an <code>ExpValueCallback</code>, providing some <code>operators</code> and a list of ITensor <code>sites</code>.  The <code>operator</code> variable can be either a vector of <code>LocalOperator</code> objects, or a string (see <code>parseoperators</code> for instructions on the allowed syntax).  Each operator will be measured on the associated sites during every step of the time evolution, and the results recorded inside the <code>ExpValueCallback</code> object as an <code>ExpValueSeries</code> for later analysis. The norm of the state, or the an equivalent quantity (trace, overlap of two sites...) where applicable, will also be computed after each step. The array <code>sites</code> is the same list of sites indices used to define MPSs and MPOs for the calculations.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/phaerrax/MPSTimeEvolution.jl/blob/94a5a1c209c273b85baa92a89486023912831b3f/src/expvalue_callback.jl#L16-L30">source</a></section></details></article><p><code>ExpValueCallback</code> is a basic callback object, already available in this package. It keeps track of the expectation values of a series of operators. To construct this object, we need to provide:</p><ul><li>a list of <code>LocalOperator</code>s,</li><li>the ITensor site indices over which the MPS we evolve is defined,</li><li>the time step for measurements.</li></ul><p>The list of operators can be an actual list of <code>LocalOperator</code> objects, but it can also be a string where <code>LocalOperator</code>s are described more compactly, as explained in <a href="../localoperators/#Local-operators">Local operators</a>. Each operator must be an existing ITensor operator. Note that no check is performed at the moment the callback is created: if the operator does not exist, an error will be thrown during the time evolution, when the callback object attempts to compute its expectation value.</p><h3 id="Example"><a class="docs-heading-anchor" href="#Example">Example</a><a id="Example-1"></a><a class="docs-heading-anchor-permalink" href="#Example" title="Permalink"></a></h3><p>Say we have an MPS <code>v</code> defined on a set of <code>N = 10</code> site indices of the “Boson” site type, and we want to measure the average occupation number on each site. We also want to compute these values not after every time step, but only after ten time steps.  This is how we need to define the callback object.</p><pre><code class="language-julia-repl hljs">julia&gt; using ITensorMPS, MPSTimeEvolution
 
 julia&gt; dt = 0.1;  # the time step for the time evolution
 
@@ -9,28 +9,33 @@ julia&gt; N = 10; sites = siteinds(&quot;Boson&quot;, N; dim=3);
 
 julia&gt; list = LocalOperator.([n =&gt; &quot;N&quot; for n in 1:N])
 10-element Vector{LocalOperator}:
- N{1}
- N{2}
- N{3}
- N{4}
- N{5}
- N{6}
- N{7}
- N{8}
- N{9}
- N{10}
+ N(1)
+ N(2)
+ N(3)
+ N(4)
+ N(5)
+ N(6)
+ N(7)
+ N(8)
+ N(9)
+ N(10)
 
 julia&gt; cb = ExpValueCallback(list, sites, 10dt)
 ExpValueCallback
-Operators: N{1}, N{2}, N{3}, N{4}, N{5}, N{6}, N{7}, N{8}, N{9} and N{10}
+Operators: N(1), N(2), N(3), N(4), N(5), N(6), N(7), N(8), N(9) and N(10)
 No measurements performed
 </code></pre><p>Alternatively, <code>cb</code> can be defined with the more compact (and readable) syntax of the <a href="../reference/#MPSTimeEvolution.parseoperators-Tuple{AbstractString}">parseoperators</a> function.  If we wanted to compute, for example, the average occupation number on the first four sites, we would write</p><pre><code class="language-julia-repl hljs">julia&gt; cb = ExpValueCallback(&quot;N(1,2,3,4)&quot;, sites, 10dt)
 ExpValueCallback
-Operators: N{1}, N{2}, N{3} and N{4}
+Operators: N(1), N(2), N(3) and N(4)
 No measurements performed
 </code></pre><h3 id="Custom-operators"><a class="docs-heading-anchor" href="#Custom-operators">Custom operators</a><a id="Custom-operators-1"></a><a class="docs-heading-anchor-permalink" href="#Custom-operators" title="Permalink"></a></h3><p>If the operator we would like to use is not already provided by ITensor, creating it is very simple. For example, let&#39;s consider the operator \(X=\frac{1}{\sqrt{2}}(a+\adj{a})\): we simply have to define a new ITensor <code>op</code> as</p><pre><code class="language-julia-repl hljs">julia&gt; using ITensors
 
-julia&gt; ITensors.op(::OpName&quot;X&quot;, ::SiteType&quot;Boson&quot;, s::Index) = 1/sqrt(2) * op(&quot;a† + a&quot;, s)</code></pre><p>Now we can use it in our callback by adding it to the list, for example:</p><pre><code class="language-julia-repl hljs">julia&gt; cb = ExpValueCallback(&quot;N(1,2,3,4),X(1,2,3,4)&quot;, sites, 10dt);</code></pre><h3 id="Results-readout"><a class="docs-heading-anchor" href="#Results-readout">Results readout</a><a id="Results-readout-1"></a><a class="docs-heading-anchor-permalink" href="#Results-readout" title="Permalink"></a></h3><p>In this section we will see how to read the expectation values collected in a callback object. We will use the callback we defined in the last section, with the <code>&quot;N(1,2,3,4),X(1,2,3,4)&quot;</code> operators. Let&#39;s set up a Hamiltonian operator and run a quick simulation with TDVP1 (see the <a href="../../examples/tdvp1/#Standard-TDVP1">TDVP1 tutorial</a>):</p><pre><code class="language-julia-repl hljs">julia&gt; v = MPS(sites, n -&gt; n == 1 ? &quot;1&quot; : &quot;0&quot;);
+julia&gt; ITensors.op(::OpName&quot;X&quot;, ::SiteType&quot;Boson&quot;, s::Index) = 1/sqrt(2) * op(&quot;a† + a&quot;, s)
+</code></pre><p>Now we can use it in our callback by adding it to the list, for example:</p><pre><code class="language-julia-repl hljs">julia&gt; cb = ExpValueCallback(&quot;N(1,2,3,4),X(1,2,3,4)&quot;, sites, 10dt)
+ExpValueCallback
+Operators: N(1), N(2), N(3), N(4), X(1), X(2), X(3) and X(4)
+No measurements performed
+</code></pre><h3 id="Results-readout"><a class="docs-heading-anchor" href="#Results-readout">Results readout</a><a id="Results-readout-1"></a><a class="docs-heading-anchor-permalink" href="#Results-readout" title="Permalink"></a></h3><p>In this section we will see how to read the expectation values collected in a callback object. We will use the callback we defined in the last section, with the <code>&quot;N(1,2,3,4),X(1,2,3,4)&quot;</code> operators. Let&#39;s set up a Hamiltonian operator and run a quick simulation with TDVP1 (see the <a href="../../examples/tdvp1/#Standard-TDVP1">TDVP1 tutorial</a>):</p><pre><code class="language-julia-repl hljs">julia&gt; v = MPS(sites, n -&gt; n == 1 ? &quot;1&quot; : &quot;0&quot;);
 
 julia&gt; v = enlargelinks(v, 4);
 
@@ -47,34 +52,25 @@ julia&gt; for n in 1:N-1
 
 julia&gt; H = MPO(h, sites);
 
-julia&gt; tdvp1!(v, H, dt, 20; callback=cb)
-Evolving state... 100%|██████████████████████████████████████████████████| Time: 0:00:26
-                        t: 20.000000000000014
-   Maximum bond dimension: 4
-         Wall time / step: 0.017
-           MPS size / MiB: 0.012
-            GC live / MiB: 119.781
-                JIT / MiB: 9.976
-           Max. RSS / GiB: 0.894</code></pre><p>By invoking <code>cb</code> we can see that there is new information:</p><pre><code class="language-julia-repl hljs">julia&gt; cb
+julia&gt; tdvp1!(v, H, dt, 10; callback=cb, progress=false);</code></pre><p>By invoking <code>cb</code> we can see that there is new information:</p><pre><code class="language-julia-repl hljs">julia&gt; cb
 ExpValueCallback
-Operators: N{1}, N{2}, N{3}, N{4}, X{1}, X{2}, X{3} and X{4}
+Operators: N(1), N(2), N(3), N(4), X(1), X(2), X(3) and X(4)
 Measured times:
   from 0.0
-  to 20.000000000000014
+  to 9.99999999999998
   each 1.0
-
 </code></pre><p>The computed expectation values can be accessed by calling the <code>expvalues</code> method on the callback: the result is a dictionary where each local operator is assigned the series of its expectation values.</p><pre><code class="language-julia-repl hljs">julia&gt; expvalues(cb)
-Dict{LocalOperator, Vector{ComplexF64}} with 8 entries:
-  N{2} =&gt; [0.0+0.0im, 0.497967+0.0im, 0.132586+0.0im, 0.0262118+0.0im,…
-  X{3} =&gt; [0.0+0.0im, -1.14256e-6+3.43722e-22im, -2.63261e-5-4.06683e-…
-  X{4} =&gt; [0.0+0.0im, 4.27215e-5-2.05802e-21im, 0.000124825-1.03762e-2…
-  X{2} =&gt; [0.0+0.0im, -1.61758e-6+6.61744e-23im, -2.2168e-6-2.60208e-1…
-  X{1} =&gt; [0.0+0.0im, -1.13453e-6-4.60006e-23im, -3.93457e-6-2.03123e-…
-  N{1} =&gt; [1.0+0.0im, 0.332612+0.0im, 0.00109072+0.0im, 0.00850228+0.0…
-  N{3} =&gt; [0.0+0.0im, 0.149637+0.0im, 0.416359+0.0im, 0.0131695+0.0im,…
-  N{4} =&gt; [0.0+0.0im, 0.0184514+0.0im, 0.316095+0.0im, 0.227534+0.0im,…
+OrderedCollections.OrderedDict{LocalOperator, Vector{ComplexF64}} with 8 entries:
+  N(1) =&gt; [1.0+0.0im, 0.332612+0.0im, 0.00109051+0.0im, 0.0085059+0.0im, 0.0034…
+  X(1) =&gt; [0.0+0.0im, -4.93851e-9-1.55657e-24im, 1.54546e-7-6.4159e-24im, 1.083…
+  N(2) =&gt; [0.0+0.0im, 0.497967-2.52076e-23im, 0.132589-7.85081e-19im, 0.0262158…
+  X(2) =&gt; [0.0+0.0im, -1.73335e-9-1.0679e-23im, 6.49531e-7+1.56158e-20im, 2.344…
+  N(3) =&gt; [0.0+0.0im, 0.149637-2.63998e-23im, 0.416356-2.54984e-23im, 0.0131673…
+  X(3) =&gt; [0.0+0.0im, -3.70391e-7+4.54031e-23im, -3.44816e-7-9.89546e-22im, 3.5…
+  N(4) =&gt; [0.0+0.0im, 0.0184914+7.90412e-20im, 0.316137-1.95008e-18im, 0.227405…
+  X(4) =&gt; [0.0+0.0im, -4.55872e-6+1.36907e-23im, 6.11274e-6-1.46214e-22im, 8.46…
 </code></pre><p>The time series for individual operators can be accessed via the <code>expvalues(cb, lop)</code> syntax, where <code>lop</code> is either a <code>LocalOperator</code> or a string that defines a single <code>LocalOperator</code>.</p><pre><code class="language-julia-repl hljs">julia&gt; expvalues(cb, LocalOperator(3 =&gt; &quot;N&quot;))
-21-element Vector{ComplexF64}:
+11-element Vector{ComplexF64}:
                    0.0 + 0.0im
     0.1496371087008667 + 0.0im
     0.4163587833281586 + 0.0im
@@ -82,10 +78,13 @@ Dict{LocalOperator, Vector{ComplexF64}} with 8 entries:
   0.047656092490155594 + 0.0im
  0.0012094869867415171 + 0.0im
   0.009031865524793884 + 0.0im
-[...]
+  0.008905435038874998 + 0.0im
+  0.010261216883988691 + 0.0im
+  0.032619559874800697 + 0.0im
+   0.22093690525361828 + 0.0im
 
 julia&gt; expvalues(cb, &quot;X(2)&quot;)
-21-element Vector{ComplexF64}:
+11-element Vector{ComplexF64}:
                      0.0 + 0.0im
    -1.617576049847552e-6 + 6.617439891157473e-23im
    -2.216802827443102e-6 - 2.602082008249062e-18im
@@ -93,9 +92,12 @@ julia&gt; expvalues(cb, &quot;X(2)&quot;)
     4.696594721193055e-5 + 6.511993073259912e-21im
    -6.763856924121541e-5 + 3.4410971976147374e-21im
    -3.686889866871368e-5 - 3.599741391814458e-21im
-[...]
+    2.176614750375809e-5 + 2.6487551060169705e-22im
+   -6.419493464380101e-5 - 2.8434333556510326e-25im
+ -0.00010698407746021099 + 6.775843525379591e-21im
+    4.065995056214414e-5 + 6.776282561183226e-21im
 </code></pre><p>Finally, we can access the time series relative to the state norm (which is the actual 2-norm of the state, the trace, or another relevant quantity depending on the chosen time-evolution algorithm).</p><pre><code class="language-julia-repl hljs">julia&gt; measurements_norm(cb)
-21-element Vector{ComplexF64}:
+11-element Vector{ComplexF64}:
                 1.0 + 0.0im
  1.0000000000000262 + 0.0im
  1.0000000000000322 + 0.0im
@@ -103,5 +105,8 @@ julia&gt; expvalues(cb, &quot;X(2)&quot;)
  1.0000000000001033 + 0.0im
  1.0000000000001088 + 0.0im
  1.0000000000001144 + 0.0im
-[...]
-</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../localoperators/">« Local operators</a><a class="docs-footer-nextpage" href="../reference/">Complete reference »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Wednesday 1 April 2026 10:50">Wednesday 1 April 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+ 1.0000000000001192 + 0.0im
+  1.000000000000159 + 0.0im
+ 1.0000000000001599 + 0.0im
+ 1.0000000000001545 + 0.0im
+</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../localoperators/">« Local operators</a><a class="docs-footer-nextpage" href="../reference/">Complete reference »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 13 April 2026 23:01">Monday 13 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
