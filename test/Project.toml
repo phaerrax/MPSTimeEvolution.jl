@@ -9,3 +9,6 @@ LindbladVectorizedTensors = "6455c26f-8985-4381-925b-8a93509e9dbd"
 MPSTimeEvolution = "509c1b6a-26da-4538-875f-50b31a76b593"
 Observers = "338f10d5-c7f1-4033-a7d1-f9dec39bcaa0"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+LindbladVectorizedTensors = "≥ 0.16.9"

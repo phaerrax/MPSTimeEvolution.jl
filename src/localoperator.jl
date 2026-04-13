@@ -54,21 +54,19 @@ end
     mps(sites::Vector{<:Index}, l::LocalOperator)
 
 Return an MPS that represents the operator described by `l` in a vectorised form.
-The MPS will have the factors in `l` prefixed by `v` on the domain of the operator, or
-`vId` outside of the domain.
+The MPS will have the factors in `l` on the domain of the operator, or `Id` outside of the
+domain.
 """
 @memoize function mps(sites::Vector{<:Index}, l::LocalOperator)
-    return MPS(
-        ComplexF64, sites, [i in domain(l) ? "v" * l[i] : "vId" for i in eachindex(sites)]
-    )
+    return MPS(ComplexF64, sites, [i in domain(l) ? l[i] : "Id" for i in eachindex(sites)])
     # The MPS needs to be complex, in general, since we can have the vectorized form of
     # non-Hermitian operator such as A or Adag. The coefficients on the Gell-Mann basis
     # of non-Hermitian operator are complex, in general.
     #
     # Since we are using Memoize for the `mpo` function we might as well memoize this
     # method too. With
-    #   s = siteinds("vOsc", 400; dim=4)
-    #   o = LocalOperator(Dict(20 => "vA", 19 => "vAdag"))
+    #   s = siteinds("vBoson", 400; dim=4)
+    #   o = LocalOperator("Adag(19)A(20)")
     # the non-memoized function takes 6.710 ms (97932 allocations: 30.36 MiB), while the
     # memoized one takes only 45.232 ns (1 allocation: 32 bytes).
 end

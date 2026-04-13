@@ -220,7 +220,7 @@ function measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)
     # measure everything at the end of the sweep.
 
     # We contract each tensor from `ψ` with the identity, separately.
-    ids = [state("vId", siteind(ψ, n)) * ψ[n] for n in eachindex(ψ)]
+    ids = [state("Id", siteind(ψ, n)) * ψ[n] for n in eachindex(ψ)]
 
     for l in ops(cb)
         # Compute the expectation values by multiplying the tensor of the LocalOperator and
@@ -228,15 +228,15 @@ function measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)
         x = OneITensor()
         for n in eachindex(ψ)
             if n in domain(l)
-                x *= state("v" * l[n], siteind(ψ, n)) * ψ[n]
+                x *= state(l[n], siteind(ψ, n)) * ψ[n]
                 # Note that contrary to `inner` or `dot`, this simple product of tensors
                 # does not imply any complex conjugation, i.e.
                 #
-                #   state("vA", s) = apply(op("A⋅", s), state("vId", s))
+                #   state("A", s) = apply(op("A⋅", s), state("Id", s))
                 #
                 # behaves as follows (`t` is an ITensor with index `s`):
                 #
-                #   state("vA", s) * t == state("vId", s) * apply(op("A⋅", s), t)
+                #   state("A", s) * t == state("Id", s) * apply(op("A⋅", s), t)
                 #
                 # so we should not use `dag` on the measured operator here.
             else
@@ -277,7 +277,7 @@ function compute_trace!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec; current_ti
     end
     # From scratch: we contract each tensor from `ψ` with the identity, separately.
     if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
-        ids = [state("vId", siteind(ψ, n)) * ψ[n] for n in eachindex(ψ)]
+        ids = [state("Id", siteind(ψ, n)) * ψ[n] for n in eachindex(ψ)]
         push!(measurements_norm(cb), scalar(prod(ids)))
     end
 
