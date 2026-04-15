@@ -9,9 +9,8 @@ Generally speaking, a callback object describes:
 * how frequently we want to calculate them, and
 * how we should compute them.
 
-The first two points are usually handled by the user at the moment of creating
-the object, while the “how” is already handled by the library, at least for the
-already defined callbacks.
+The first two points are usually specified by the user at the moment of creating
+the object, while the “how” is handled by the specific callback method.
 
 More complicated callbacks can be defined: for example, we could define a
 callback that computes the entanglement entropy relative to a bipartition by
@@ -224,3 +223,40 @@ julia> measurements_norm(cb)
  1.0000000000001545 + 0.0im
 
 ```
+
+## Callback for superfermionic MPSs
+
+The `SuperfermionCallback` is a callback object available for working with the
+superfermion formalism
+[Schmutz1978:real_time_greens_functions,Brenes2020:TN_thermal_machines](@cite).
+This package can in fact be used for simulating mixed-state dynamics, where a
+mixed state of \\(N\\) fermions is represented as a pure state of \\(2N\\)
+fermions, i.e. a standard, larger MPS.
+This larger MPS is an ordinary MPS, but we must manipulate it differently than
+if it were a “true” pure state when we want to extract physical information from
+it.
+The `SuperfermionCallback` type contains exactly the functions and definitions
+needed to work with MPSs representing mixed states through the superfermion
+formalism.
+
+```@docs; canonical=false
+SuperfermionCallback
+```
+
+In this package, we assume that the fermionic sites are ordered such that the
+ancillary sites are next to the physical ones, namely the \\(n\\)-th physical
+mode is on site \\(2n-1\\) while its associated ancillary mode is on site
+\\(2n\\).
+This structure must be kept in mind when defining the operators that we want to
+measure, as they will need to be defined on the physical sites.
+Moreover, as the `LocalOperator`s have no automatic Jordan-Wigner strings,
+operators made of annihilation and creation operators must include the
+appropriate “string factors” (through the `"F"` operator) so that the
+anticommutation rules are satisfied.
+A detailed walkthrough can be found in [TDVP1 with superfermions](@ref).
+
+Just as with `ExpValueCallback`, to construct this object we need to provide:
+
+* a list of `LocalOperator`s,
+* the ITensor site indices over which the MPS we evolve is defined,
+* the time step for measurements.
