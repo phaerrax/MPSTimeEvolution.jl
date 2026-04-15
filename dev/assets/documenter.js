@@ -72,6 +72,10 @@ window.MathJax = {
         "#1^\\dagger",
         1
       ],
+      "anc": [
+        "\\tilde{#1}",
+        1
+      ],
       "avg": [
         "\\langle #1\\rangle",
         1
@@ -197,6 +201,10 @@ window.MathJax = {
       ],
       "vacuum": [
         "\\varOmega"
+      ],
+      "vec": [
+        "V(#1)",
+        1
       ]
     },
     "packages": [
