@@ -8,6 +8,7 @@ export TEvoCallback,
     LocalPosVecMeasurementCallback,
     measurement_ts,
     measurements_norm,
+    callback_dt,
     expvalues
 
 """
