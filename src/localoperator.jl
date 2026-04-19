@@ -124,10 +124,9 @@ function parseoperators(s::AbstractString)
         # Decide whether we have a product of operators, such as x(1)y(2), or a
         # sequence such as x(1,2,3)
         d = Dict{Int,String}()
-        foreach(
-            re -> push!(d, parse(Int, re["site"]) => re["name"]),
-            eachmatch(r"(?<name>\w+?)\((?<site>\d+?)\)", opstrings[i]),
-        )
+        foreach(eachmatch(r"(?<name>.+?)\((?<site>\d+?)\)", opstrings[i])) do re
+            push!(d, parse(Int, re["site"]) => re["name"])
+        end
         push!(ops, LocalOperator(d))
         i += 1
     end
@@ -150,10 +149,10 @@ julia> ops = Dict("x" => [1, 2, 3], "y" => [2]);
 
 julia> parseoperators(ops)
 4-element Vector{LocalOperator}:
- x{1}
- x{2}
- x{3}
- y{2}
+ x(1)
+ x(2)
+ x(3)
+ y(2)
 ```
 """
 function parseoperators(d::Dict)

@@ -91,7 +91,9 @@ each term is separated by a comma, and additionally:
 
 * writing a comma-separated list of numbers in the parentheses expands to a
   list of operators with the same name on each of the sites in the list, i.e.
-  `a(1,2,3)` is interpreted as `a(1),a(2),a(3)`.
+  `a(1,2,3)` is interpreted as `a(1),a(2),a(3)`. This works with single-site
+  operators only, i.e. terms such as like `a(2)b(4,5)` or `a(1,2)b(1,2)` are not
+  allowed and will return an error.
 
 ```jldoctest localoperators
 julia> parseoperators("x(1)y(3),y(4),z(1,2,3)")
