@@ -3,6 +3,7 @@ using MPSTimeEvolution
 
 # doctest dependencies
 using ITensors, ITensorMPS, KrylovKit, LindbladVectorizedTensors
+using CSV, DataFrames, Plots
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style=:numeric)
 
@@ -24,6 +25,7 @@ makedocs(;
             "examples/tdvp1vec.md",
             "examples/time_dependent_tdvp.md",
             "examples/tdvp1_sf.md",
+            "examples/tdvp1_adaptive.md",
         ],
     ],
     plugins=[bib],
@@ -37,11 +39,14 @@ makedocs(;
                         ["base", "ams", "autoload", "configmacros", "mathtools"],
                     :macros => Dict(
                         :C => [raw"\mathbb{C}"],
+                        :Env => [raw"_\mathrm{E}"],
                         :Im => [raw"\mathrm{Im}"],
+                        :Int => [raw"_\mathrm{I}"],
                         :N => [raw"\mathbb{N}"],
                         :Num => [raw"\mathscr{N}"],
                         :R => [raw"\mathbb{R}"],
                         :Re => [raw"\mathrm{Re}"],
+                        :Sys => [raw"_\mathrm{S}"],
                         :abs => [raw"\lvert #1 \rvert", 1],
                         :adj => [raw"#1^\dagger", 1],
                         :anc => [raw"\tilde{#1}", 1],
@@ -49,6 +54,7 @@ makedocs(;
                         :blank => [raw"{-}"],
                         :bra => [raw"\langle #1 \rvert", 1],
                         :conj => [raw"\bar{#1}", 1],
+                        :cutoff => [raw"_\mathrm{c}"],
                         :dd => [raw"\mathrm{d}"],
                         :defeq => [raw"\mathrel{\mathop:}="],
                         :det => [raw"\operatorname{det}"],
@@ -70,6 +76,7 @@ makedocs(;
                         :pauliy => [raw"\sigma_y^{(#1)}", 1, ""],
                         :pauliz => [raw"\sigma_z^{(#1)}", 1, ""],
                         :phantomadj => [raw"^{\vphantom{\dagger}}"],
+                        :proj => [raw"\outp{#1}{#1}", 1],
                         :real => [raw"_{\mathrm{r}}"],
                         :sb => [raw"_{#1}", 1],
                         :set => [raw"\{\, #1 \;\vert\; #2\,\}", 2],
