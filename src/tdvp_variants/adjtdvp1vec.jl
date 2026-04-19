@@ -85,19 +85,24 @@ function adjtdvp1vec!(
     # "imaginary-time" evolution types. We just have a generic equation of the form
     # v'(t) = L v(t).
 
-    io_handle = open(io_file, "w")
-    columnheaders = ["time"]
-    if length(initialstates) == 1
-        push!(columnheaders, "exp_val_real", "exp_val_imag")
-    else
-        for l in initialstatelabels
-            push!(columnheaders, "exp_val_$(l)_real", "exp_val_$(l)_imag")
+    if !isnothing(io_file)
+        io_handle = open(io_file, "w")
+        columnheaders = ["time"]
+        if length(initialstates) == 1
+            push!(columnheaders, "exp_val_real", "exp_val_imag")
+        else
+            for l in initialstatelabels
+                push!(columnheaders, "exp_val_$(l)_real", "exp_val_$(l)_imag")
+            end
         end
+        println(io_handle, join(columnheaders, ","))
+    else
+        io_handle = nothing
     end
-    println(io_handle, join(columnheaders, ","))
 
     ranks_handle = writeheaders_ranks(ranks_file, length(operator))
     times_handle = writeheaders_stime(times_file)
+    # These functions return nothing if the files are nothing
 
     N = length(operator)
 
@@ -110,16 +115,20 @@ function adjtdvp1vec!(
     current_time = zero(dt)
     prev_t = zero(dt)
 
-    data = [current_time]
-    expvals = [inner(s, operator) for s in initialstates]
-    for x in expvals
-        push!(data, real(x), imag(x))
+    if !isnothing(io_handle)
+        data = [current_time]
+        expvals = [inner(s, operator) for s in initialstates]
+        for x in expvals
+            push!(data, real(x), imag(x))
+        end
+        println(io_handle, join(data, ","))
+        flush(io_handle)
     end
-    println(io_handle, join(data, ","))
-    flush(io_handle)
 
-    println(ranks_handle, join([current_time; linkdims(operator)], ","))
-    flush(ranks_handle)
+    if !isnothing(ranks_handle)
+        println(ranks_handle, join([current_time; linkdims(operator)], ","))
+        flush(ranks_handle)
+    end
 
     for s in 1:nsteps
         stime = @elapsed begin
@@ -160,28 +169,34 @@ function adjtdvp1vec!(
         # time a sweep and we check if current_time - prev_t = meas_stride.
         # If it is so, then we go on and compute the expectation value (and update prev_t).
         if (current_time - prev_t ≈ meas_stride || current_time == 0)
-            data = [current_time]
+            if !isnothing(io_handle)
+                data = [current_time]
 
-            expvals = [inner(s, operator) for s in initialstates]
-            for x in expvals
-                push!(data, real(x), imag(x))
+                expvals = [inner(s, operator) for s in initialstates]
+                for x in expvals
+                    push!(data, real(x), imag(x))
+                end
+
+                println(io_handle, join(data, ","))
+                flush(io_handle)
             end
 
-            println(io_handle, join(data, ","))
-            flush(io_handle)
-
+            if !isnothing(ranks_handle)
             println(ranks_handle, join([current_time; linkdims(operator)], ","))
-            flush(ranks_handle)
+                flush(ranks_handle)
+            end
 
-            printoutput_stime(times_handle, stime)
+            if !isnothing(times_handle)
+                printoutput_stime(times_handle, stime)
+            end
 
             prev_t = current_time
         end
     end  # of the time evolution.
 
-    !isnothing(io_file) && close(io_handle)
-    !isnothing(ranks_file) && close(ranks_handle)
-    !isnothing(times_file) && close(times_handle)
+    !isnothing(io_handle) && close(io_handle)
+    !isnothing(ranks_handle) && close(ranks_handle)
+    !isnothing(times_handle) && close(times_handle)
 
     return nothing
 end
@@ -205,6 +220,7 @@ function adaptiveadjtdvp1vec!(
         solver, operator, [initialstate], L, dt, tmax, meas_stride; kwargs...
     )
 end
+
 # Transform sum of evolution operator MPOa into a ProjMPOSum
 function adaptiveadjtdvp1vec!(
     solver, operator::MPS, initialstates, Ls::Vector{MPO}, dt, tmax, meas_stride; kwargs...
@@ -263,19 +279,24 @@ function adaptiveadjtdvp1vec!(
     # "imaginary-time" evolution types. We just have a generic equation of the form
     # v'(t) = L v(t).
 
-    io_handle = open(io_file, "w")
-    columnheaders = ["time"]
-    if length(initialstates) == 1
-        push!(columnheaders, "exp_val_real", "exp_val_imag")
-    else
-        for l in initialstatelabels
-            push!(columnheaders, "exp_val_$(l)_real", "exp_val_$(l)_imag")
+    io_handle = if !isnothing(io_file)
+        open(io_file, "w")
+        columnheaders = ["time"]
+        if length(initialstates) == 1
+            push!(columnheaders, "exp_val_real", "exp_val_imag")
+        else
+            for l in initialstatelabels
+                push!(columnheaders, "exp_val_$(l)_real", "exp_val_$(l)_imag")
+            end
         end
+        println(io_handle, join(columnheaders, ","))
+    else
+        nothing
     end
-    println(io_handle, join(columnheaders, ","))
 
     ranks_handle = writeheaders_ranks(ranks_file, length(operator))
     times_handle = writeheaders_stime(times_file)
+    # These functions return nothing if the files are nothing
 
     N = length(operator)
 
@@ -326,6 +347,7 @@ function adaptiveadjtdvp1vec!(
         # time a sweep and we check if current_time - prev_t = meas_stride.
         # If it is so, then we go on and compute the expectation value (and update prev_t).
         if (current_time - prev_t ≈ meas_stride || current_time == 0)
+            if !isnothing(io_handle)
             data = [current_time]
 
             expvals = [inner(s, operator) for s in initialstates]
@@ -335,19 +357,24 @@ function adaptiveadjtdvp1vec!(
 
             println(io_handle, join(data, ","))
             flush(io_handle)
+        end
 
+            if !isnothing(ranks_handle)
             println(ranks_handle, join([current_time; linkdims(operator)], ","))
             flush(ranks_handle)
+        end
 
+            if !isnothing(times_handle)
             printoutput_stime(times_handle, stime)
+        end
 
             prev_t = current_time
         end
     end  # of the time evolution.
 
-    !isnothing(io_file) && close(io_handle)
-    !isnothing(ranks_file) && close(ranks_handle)
-    !isnothing(times_file) && close(times_handle)
+    !isnothing(io_handle) && close(io_handle)
+    !isnothing(ranks_handle) && close(ranks_handle)
+    !isnothing(times_handle) && close(times_handle)
 
     return nothing
 end
