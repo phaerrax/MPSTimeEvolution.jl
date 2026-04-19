@@ -89,6 +89,7 @@ function adaptivetdvp1_preserves_trace(; dt, tmax, N)
         io_ranks="/dev/null",
         io_times="/dev/null",
         convergence_factor_bonddims=1e-12,
+        maxbonddim=8,
     )
 
     f = CSV.File(tmpfile)

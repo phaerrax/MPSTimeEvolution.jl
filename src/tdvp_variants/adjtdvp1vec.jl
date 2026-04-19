@@ -194,12 +194,7 @@ end
         [solver,] operator, initialstates::Vector{MPS}, L, dt, tmax, meas_stride; kwargs...
     )
 
-Like `adjtdvp1vec!`, but grows the bond dimensions of the MPS of the operator along the time
-evolution until a certain convergence criterium is met.
-The keyword argument `convergence_factor_bonddims`, which defaults to `1e-4`, controls the
-convergence of the adaptation algorithm.
-
-For an explanation of the other arguments, see [`adjtdvp1vec!`](@ref).
+$(adaptive_variant_str("adjtdvp1vec!"))
 """
 function adaptiveadjtdvp1vec! end
 
@@ -236,7 +231,16 @@ end
 
 # Most general version: vector of initial states and evolution operator as ProjMPO
 function adaptiveadjtdvp1vec!(
-    solver, operator::MPS, initialstates::Vector{MPS}, PL, dt, tmax, meas_stride; kwargs...
+    solver,
+    operator::MPS,
+    initialstates::Vector{MPS},
+    PL,
+    dt,
+    tmax,
+    meas_stride;
+    convergence_factor_bonddims,
+    maxbonddim,
+    kwargs...,
 )
     nsteps = floor(Int, tmax / dt)
     exp_tol = get(kwargs, :exp_tol, 1e-14)
@@ -245,8 +249,6 @@ function adaptiveadjtdvp1vec!(
     io_file = get(kwargs, :io_file, nothing)
     ranks_file = get(kwargs, :io_ranks, nothing)
     times_file = get(kwargs, :io_times, nothing)
-    convergence_factor_bonddims = get(kwargs, :convergence_factor_bonddims, 1e-4)
-    max_bond = get(kwargs, :max_bond, maxlinkdim(operator))
     decomp = get(kwargs, :which_decomp, "qr")
     initialstatelabels = get(kwargs, :initialstatelabels, string.(1:length(initialstates)))
 
@@ -285,7 +287,7 @@ function adaptiveadjtdvp1vec!(
         position!(PL, operator, 1)
 
         @debug "[Step $s] Attempting to grow the bond dimensions."
-        adaptbonddimensions!(operator, PL, max_bond, convergence_factor_bonddims)
+        adaptbonddimensions!(operator, PL, maxbonddim, convergence_factor_bonddims)
 
         stime = @elapsed begin
             # In TDVP1 only one site at a time is modified, so we iterate on the sites

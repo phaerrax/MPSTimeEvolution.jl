@@ -267,13 +267,10 @@ end
     adaptivetdvp1!([solver,] state::MPS, H::MPO, dt, tmax; kwargs...)
     adaptivetdvp1!([solver,] state::MPS, H::Vector{MPO}, dt, tmax; kwargs...)
 
-Like `tdvp1!`, but grows the bond dimensions of the MPS along the time evolution until
-a certain convergence criterium is met.
-The keyword argument `convergence_factor_bonddims`, which defaults to `1e-4`, controls the
-convergence of the adaptation algorithm.
-
-For an explanation of the other arguments, see [`tdvp1!`](@ref).
+$(adaptive_variant_str("tdvp1!"))
 """
+function adaptivetdvp1! end
+
 function adaptivetdvp1!(solver, state::MPS, Hs::Vector{MPO}, dt, tmax; kwargs...)
     # (Copied from ITensorsTDVP)
     for H in Hs
@@ -289,7 +286,9 @@ function adaptivetdvp1!(solver, state::MPS, H::MPO, dt, tmax; kwargs...)
     return adaptivetdvp1!(solver, state::MPS, ProjMPO(H), dt, tmax; kwargs...)
 end
 
-function adaptivetdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
+function adaptivetdvp1!(
+    solver, state::MPS, PH, dt, tmax; convergence_factor_bonddims, maxbonddim, kwargs...
+)
     nsteps = floor(Int, tmax / dt)
     cb = get(kwargs, :callback, NoTEvoCallback())
     hermitian = get(kwargs, :hermitian, true)
@@ -301,8 +300,6 @@ function adaptivetdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
     ranks_file = get(kwargs, :io_ranks, nothing)
     times_file = get(kwargs, :io_times, nothing)
     store_state0 = get(kwargs, :store_psi0, false)
-    convergence_factor_bonddims = get(kwargs, :convergence_factor_bonddims, 1e-4)
-    max_bond = get(kwargs, :max_bond, maxlinkdim(state))
     which_decomp = get(kwargs, :which_decomp, "qr")
 
     if get(kwargs, :progress, true)
@@ -342,7 +339,7 @@ function adaptivetdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
         # Before each sweep, we grow the bond dimensions a bit.
         # See Dunnett and Chin, 2020 [arXiv:2007.13528v2].
         @debug "[Step $s] Attempting to grow the bond dimensions."
-        adaptbonddimensions!(state, PH, max_bond, convergence_factor_bonddims)
+        adaptbonddimensions!(state, PH, maxbonddim, convergence_factor_bonddims)
 
         stime = @elapsed for (site, ha) in sweepnext(N; ncenter=1)
             # sweepnext(N) is an iterable object that evaluates to tuples of the form

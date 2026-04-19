@@ -148,6 +148,7 @@ include("compare_tdvp_methods.jl")
                 couplings=couplings,
                 check_sites=sites,
                 init=alternate,
+                maxbonddim=10,
             )
             @test all(
                 all(isapprox.(r1, r2; atol=adaptive_tdvp1_atol)) for

@@ -253,3 +253,20 @@ function simulationinfo(x::Vector{MPS}, current_time, stime; digits=3)
         ("Max. RSS / GiB", round(Sys.maxrss() / (2^30); digits=digits)),
     ]
 end
+
+function adaptive_variant_str(compare_to)
+    return """
+Like `$compare_to`, but dynamically increases the bond dimensions of the MPS, before each
+step of the time evolution, until a convergence criterium is met.
+
+In adddition to the mandatory or optional keyword arguments of `$compare_to`, this method
+*requires* the following additional arguments.
+
+* `convergence_factor_bonddim` controls the precision of the adaptation algorithm (lower
+  values will lead to higher bond dimensions).
+* `maxbonddim` sets an upper limit beyond which the algorithm will not try to increase the
+  bond dimension further.
+
+For an explanation of the other arguments, see [`$compare_to`](@ref).
+"""
+end

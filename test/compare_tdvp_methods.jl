@@ -377,7 +377,14 @@ function siam_adjtdvp1vec(; dt, tmax, freqs, couplings, check_sites, init)
 end
 
 function siam_adaptivetdvp1(;
-    dt, tmax, freqs, couplings, check_sites, init, convergence_factor_bonddims=1e-12
+    dt,
+    tmax,
+    freqs,
+    couplings,
+    check_sites,
+    init,
+    maxbonddim,
+    convergence_factor_bonddims=1e-12,
 )
     N = length(freqs)
     sites = siteinds("Fermion", N)
@@ -417,6 +424,7 @@ function siam_adaptivetdvp1(;
         io_ranks="/dev/null",
         io_times="/dev/null",
         convergence_factor_bonddims=convergence_factor_bonddims,
+        maxbonddim=maxbonddim,
     )
 
     f = CSV.File(tmpfile)
