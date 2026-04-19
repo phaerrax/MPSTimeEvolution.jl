@@ -1,8 +1,7 @@
 # Non-unitary TDVP1
 
-The non-unitary, or _vectorised_, TDVP1 algorithm works in an analogous way as
-its unitary counterpart, except that it can be used to solve a more general
-ODE problem
+The non-unitary, or _vectorised_, TDVP1 algorithm is a generalisation of the
+standard, unitary one that it can be used to solve a more general ODE problem
 
 ```math
 \begin{cases}
@@ -23,22 +22,48 @@ computed differently, since with a mixed state \\(\avg{A}\sb{t} = \tr(A
 tdvp1vec!
 ```
 
+## States and operators
+
 In order to define mixed states and operators acting on it, we rely on the
 [LindbladVectorizedTensors](https://github.com/phaerrax/LindbladVectorizedTensors.jl)
 package, which provides new site types that can be used in this scenario.
+
+### Initial state
+
+We start with a state with alternating magnetisation,
+
+```math
+\rho_0 = \outp{\spinup}{\spinup} \otimes \outp{\spindown}{\spindown} \otimes
+         \outp{\spinup}{\spinup} \otimes \outp{\spindown}{\spindown} \otimes
+         \dotsb {}
+```
+
+just as in the tutorial for the unitary TDVP1 algorithm.
+
+```jldoctest tdvp1vec
+julia> using ITensorMPS, MPSTimeEvolution, LindbladVectorizedTensors
+
+julia> N = 10; s = siteinds("vS=1/2", N);
+
+julia> ρₜ = MPS(s, n -> isodd(n) ? "↑" : "↓");
+
+julia> ρₜ = enlargelinks(ρₜ, 4);
+```
+
+Here the strings `"↑"` and `"↓"` define pure states in the up and down spin
+positions respectively; this time, unlike with what we had in the unitary TDVP1
+tutorial, the pure state is e.g. \\(\outp{\spinup}{\spinup}\\) instead of just
+\\(\ket{\spinup}\\).
+We also use the `enlargelinks` function to expand the bond dimension
+artificially at the beginning of the calculation.
+
+### Unitary part of the master equation
+
 Our Hamiltonian operator will be
 
 ```math
 H = -\frac12 \sum_{n=1}^{N-1} \pauliz[n] \pauliz[n+1] +\sum_{n=1}^{N} \paulix[n]
 ```
-
-and we will start with a state with alternating magnetisation,
-
-```math
-\rho_0 = \outp{\spinup}{\spinup} \otimes \outp{\spindown}{\spindown} \otimes \outp{\spinup}{\spinup} \otimes \outp{\spindown}{\spindown} \otimes \dotsb {}
-```
-
-just as in the tutorial for the unitary TDVP1 algorithm.
 
 !!! tip "Unitary part of the GKSL equation"
     LindbladVectorizedTensors provides some utility functions that allow us
@@ -60,12 +85,6 @@ just as in the tutorial for the unitary TDVP1 algorithm.
     while `⋅A` is the multiplication on the right.
 
 ```jldoctest tdvp1vec
-julia> using ITensorMPS, MPSTimeEvolution, LindbladVectorizedTensors
-
-julia> N = 10; s = siteinds("vS=1/2", N);
-
-julia> ρₜ = MPS(s, n -> isodd(n) ? "↑" : "↓");
-
 julia> ℓ = OpSum();
 
 julia> for n in 1:N
@@ -78,10 +97,7 @@ julia> for n in 1:N-1
 
 ```
 
-Here the strings `"↑"` and `"↓"` define pure states in the up and down spin
-positions respectively; this time, unlike with what we had in the unitary TDVP1
-tutorial, the pure state is e.g. \\(\outp{\spinup}{\spinup}\\) instead of just
-\\(\ket{\spinup}\\).
+### Non-unitary part of the master equation
 
 We also add some non unitary terms:
 
@@ -105,12 +121,14 @@ julia> for n in [1,N]
 definition of \\(\dissipator\sb{n}\\): first the state is multiplied on the
 right by \\(\sigma\sb+\\), then by \\(\sigma\sb-\\).)
 
-Finally we construct the MPO:
+Finally, we construct the MPO:
 
 ```jldoctest tdvp1vec
 julia> L = MPO(ℓ, s);
 
 ```
+
+## Time evolution
 
 We set the time step and the total evolution time to
 
@@ -188,6 +206,117 @@ time,Sz(1)_re,Sz(1)_im,Sz(2)_re,Sz(2)_im,Sz(3)_re,Sz(3)_im,Norm_re,Norm_im
 While the `tdvp1!` method prints the 2-norm of the pure state under the
 `Norm_re` and `Norm_im` columns, the `tdvp1vec!` method prints the trace of the
 mixed state instead.  In this case, we see that \\(\tr\rho\sb{t}\\) is
-approximately 1 for the whole evolution, which is good.
-The other two files `bdim_file` and `time_file` are
-completely analogous to the ones in the unitary case.
+approximately 1 for the whole evolution, which is good.  The other two files
+`bdim_file` and `time_file` are completely analogous to the ones in the unitary
+case.
+
+## Adjoint time evolution
+
+If the time-evolution problem does not explicitly depend on time, then the state
+evolves as \\(\rho\sb{t} = \exp(tL) \rho\sb0\\).  When we are only interested
+in computing the expectation value of a single observable \\(A\\) over time,
+that is \\(\tr(A \exp(tL) \rho\sb0)\\), we might as well shift the evolution
+operator on the opposite side of the trace inner product and compute instead
+\\(\exp(tL')A\\), where \\(L'\\) is the adjoint of \\(L\\) in the context of the
+space of Hilbert-Schmidt operators.[^1]
+This may lead to a quicker computation in some cases, for example if the initial
+state \\(\rho\sb0\\) is highly entangled while \\(A\\) is a rather trivial
+observable.
+This “adjoint” time evolution is implemented by the `adjtdvp1vec!` function.
+
+```@docs; canonical=false
+adjtdvp1vec!
+```
+
+### Evolving an observable
+
+Returning to the previous example, let's evolve the `"Sz(1)"` observable with
+the same generator `L` and the same initial state (which here we call `ρ₀`):
+
+```jldoctest tdvp1vec
+julia> ρ₀ = MPS(s, n -> isodd(n) ? "↑" : "↓");
+
+julia> target_op = enlargelinks(MPS(s, n -> n == 1 ? "Sz" : "Id"), 4);
+
+```
+
+!!! warning "Callback utility not implemented"
+    As of the time this guide was written, the adjoint TDVP1 function does not
+    use a callback operator to store the results; they must instead be written
+    on an external file during the evolution, in the usual way, and then later
+    retrieved from it.
+
+Let's set up a temporary file to store the progressive results, and start the
+evolution with \\(L'\\) with the same time parameters as before. With ITensor,
+the Hermitian conjugate of a tensor `x` is simply given by `swapprime(dag(x), 0
+=> 1)`.
+
+```jldoctest tdvp1vec; setup = :(using ITensors)
+julia> expval_file, _ = mktemp();
+
+julia> adjL = swapprime(dag(L), 0 => 1);
+
+julia> adjtdvp1vec!(target_op, ρ₀, adjL, dt, tmax, callback_dt(cb); progress=false, io_file=expval_file);
+```
+
+Let's check that we got the same result:
+
+```jldoctest tdvp1vec; filter = r"(\s+)?[-+]?([0-9]*[.])?[0-9]+([eE][-+]?\d+)?[-+]([0-9]*[.])?[0-9]+([eE][-+]?\d+)?im(\s+)?"m => "### + ###im"
+julia> using CSV
+
+julia> meas_output, expval_output = CSV.File(meas_file), CSV.File(expval_file);
+
+julia> [complex.(expval_output.exp_val_real, expval_output.exp_val_imag) complex.(meas_output.var"Sz(1)_re", meas_output.var"Sz(1)_im")]
+11×2 Matrix{ComplexF64}:
+        0.5+0.0im                 0.5+0.0im
+   0.395987+7.46235e-12im    0.395986-5.90342e-18im
+    0.28776+2.52819e-12im    0.287733+2.08504e-16im
+   0.180616+1.73874e-10im    0.180583+3.37234e-16im
+  0.0791364+3.79154e-10im   0.0791222+1.81296e-16im
+  -0.012963+8.2458e-10im   -0.0129606-3.16275e-17im
+ -0.0929154+3.63462e-9im   -0.0928986-2.24106e-16im
+  -0.158926+5.61876e-9im    -0.158897-3.8465e-16im
+  -0.210136+8.13226e-9im    -0.210098-5.08743e-16im
+  -0.246548+1.08225e-8im    -0.246503-5.95024e-16im
+  -0.268899+1.06022e-8im    -0.268849-6.48083e-16im
+
+```
+
+There are deviations of about \\(10^{-5}\\), which are acceptable considering
+the low accuracy of our setup.
+
+### Defining the adjoint of the generator from scratch
+
+If `L` is not already available, we can directly construct its adjoint in the
+following way.
+Once again, we use the utilities provided by LindbladVectorizedTensors.
+Since the adjoint (again in the context of the space of Hilbert-Schmidt
+operators) of the \\(-\iu [X,\blank]\\) operator is simply \\(\iu [X,\blank]\\),
+for the unitary part we just have to change sign to `gkslcommutator`.  For the
+dissipative part, instead, we must do it by hand.
+
+```jldoctest tdvp1vec
+julia> adjℓ = OpSum();
+
+julia> for n in 1:N
+           adjℓ += -gkslcommutator("σx", n)
+       end
+
+julia> for n in 1:N-1
+           adjℓ += 0.5 * gkslcommutator("σz", n, "σz", n+1)
+       end
+
+julia> for n in [1,N]
+           adjℓ += "σ+⋅ * ⋅σ-", n
+           adjℓ += -0.5, "σ+⋅ * σ-⋅", n
+           adjℓ += -0.5, "⋅σ- * ⋅σ+", n
+       end
+
+julia> MPO(adjℓ, s) ≈ adjL
+true
+```
+
+[^1]: If the vectorisation is performed by taking the coefficients of
+    states and operators with respect to an orthonormal basis, then this adjoint
+    is none other that the Hermitian conjugate of the matrix (or MPO, in our
+    case).
