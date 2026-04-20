@@ -49,8 +49,14 @@ window.MathJax = {
       "C": [
         "\\mathbb{C}"
       ],
+      "Env": [
+        "_\\mathrm{E}"
+      ],
       "Im": [
         "\\mathrm{Im}"
+      ],
+      "Int": [
+        "_\\mathrm{I}"
       ],
       "N": [
         "\\mathbb{N}"
@@ -63,6 +69,9 @@ window.MathJax = {
       ],
       "Re": [
         "\\mathrm{Re}"
+      ],
+      "Sys": [
+        "_\\mathrm{S}"
       ],
       "abs": [
         "\\lvert #1 \\rvert",
@@ -90,6 +99,9 @@ window.MathJax = {
       "conj": [
         "\\bar{#1}",
         1
+      ],
+      "cutoff": [
+        "_\\mathrm{c}"
       ],
       "dd": [
         "\\mathrm{d}"
@@ -170,6 +182,10 @@ window.MathJax = {
       ],
       "phantomadj": [
         "^{\\vphantom{\\dagger}}"
+      ],
+      "proj": [
+        "\\outp{#1}{#1}",
+        1
       ],
       "real": [
         "_{\\mathrm{r}}"
