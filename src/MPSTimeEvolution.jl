@@ -1,8 +1,10 @@
 module MPSTimeEvolution
 
+using NDTensors
 using ITensors
 using ITensorMPS
 using IterTools
+using IsApprox
 using LinearAlgebra
 using OrderedCollections
 using Memoize
@@ -38,6 +40,11 @@ include("tdvp_variants/tdvp2vec.jl")
 include("tdvp_variants/adjtdvp1vec.jl")
 include("tdvp_variants/tdvp_other.jl")
 include("tdvp_variants/jointtdvp1.jl")
+
+include("mps_vidal_definition.jl")
+include("mps_vidal_indices.jl")
+include("mps_vidal_algebra.jl")
+include("mps_vidal_to_mps.jl")
 
 include("physical_systems.jl")
 
