@@ -171,41 +171,6 @@ psi = VidalMPS(sites, states)
 VidalMPS(sites::Vector{<:Index}, states) = VidalMPS(Float64, sites, states)
 
 """
-    setindex!(ψ::VidalMPS, A::ITensor, r::UnitRange{Int}; kwargs...)
-
-Replace the sites of the Vidal MPS `ψ` within the range `r` with the tensor `A`, splitting
-up `A` into MPS tensors.
-"""
-function Base.setindex!(ψ::VidalMPS, A::ITensor, r::UnitRange{Int}; kwargs...)
-    # The ITensor A will have some site indices. We need to factor it into an MPS-like form,
-    # with a different site block for each site index.
-
-    # 1. Get the site indices involved in the decomposition, and sort them by increasing
-    #    site number.
-    site_indices = filter(in(siteinds(ψ)), inds(A))
-    N = length(site_indices)
-
-    # 2. Gather the indices relative to the leftmost site of A.
-    #    If A is not on the left edge of the MPS, we also include the link index which is
-    #    dangling on the left.
-    linds = commoninds(A, site_tensors(ψ)[r[1]])
-
-    # 3. Recursively decompose A with an SVD, until we exhaust the site indices.
-    for n in 1:(N - 1)
-        L, b, R = svd(A, linds...; kwargs...)#, tags = tags[n]
-        site_tensors(ψ)[r[n]] = L
-        bond_tensors(ψ)[r[n]] = b
-
-        # Prepare for next iteration.
-        A = R
-        linds = commoninds(A, site_tensors(ψ)[r[n + 1]])
-    end
-    site_tensors(ψ)[r[N]] = A
-
-    return ψ
-end
-
-"""
     copy(::VidalMPS)
 
 Make a shallow copy of a VidalMPS. By shallow copy, it means that a new VidalMPS is
