@@ -174,3 +174,16 @@ include("expval_smart_contract.jl")
     @test expval_vec()
     @test expval_vec_sf()
 end
+
+@testset "Vidal MPS" begin
+    N = 8
+    s = siteinds("S=1/2", N)
+    x = random_mps(ComplexF64, s; linkdims=4)
+    y = random_mps(ComplexF64, s; linkdims=4)
+    x_vidal = convert(VidalMPS, x)
+    y_vidal = convert(VidalMPS, y)
+
+    @test dot(x_vidal, y_vidal) ≈ conj(dot(y_vidal, x_vidal))
+    @test dot(x_vidal, y_vidal) ≈ dot(x, y)
+    @test norm(x_vidal) ≈ norm(x)
+end
