@@ -17,7 +17,7 @@ findsites(ψ, s[3]) == [3]
 findsites(ψ, (s[4], s[1])) == [1, 4]
 ```
 """
-ITensorMPS.findsites(ψ::VidalMPS, is) = findall(hascommoninds(is), site_tensors(ψ))
+ITensorMPS.findsites(ψ::VidalMPS, is) = findall(hascommoninds(is), siteinds(ψ))
 # Bond indices are internal, so we don't even consider them.
 
 ITensorMPS.findsites(ψ::VidalMPS, s::Index) = findsites(ψ, IndexSet(s))
