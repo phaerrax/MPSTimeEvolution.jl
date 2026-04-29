@@ -17,8 +17,13 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; cutoff=1e-8)
     # We follow Schollwöck's approach from his 2011 review article ("Conversion A, B → Γ Λ"
     # starting at page 138).
 
-    # We start from a right-normalised MPS.
-    ψ = orthogonalize(ψ, 1)
+    # Start from a right-normalised MPS.
+    ψ = deepcopy(ψ)
+    orthogonalize!(ψ, 1)
+    # (We need to deepcopy the MPS otherwise the calls to `replacetags!` below wend up
+    # modifying the original ψ. I hoped that calling the non-modifying version of
+    # `orthogonalize` would be enough to create a copy of the original MPS, but apparently
+    # it is not enough.)
 
     # Replace the "l=$n" names in the link indices of the original MPS with something else,
     # in order to avoid an overlap with the "l=$n" tags we want to use for the final MPS.
