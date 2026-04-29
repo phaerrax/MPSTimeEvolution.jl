@@ -45,6 +45,7 @@ include("mps_vidal_definition.jl")
 include("mps_vidal_indices.jl")
 include("mps_vidal_algebra.jl")
 include("mps_vidal_to_mps.jl")
+include("mps_vidal_apply.jl")
 
 include("physical_systems.jl")
 

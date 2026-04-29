@@ -175,7 +175,7 @@ include("expval_smart_contract.jl")
     @test expval_vec_sf()
 end
 
-@testset "Vidal MPS" begin
+@testset verbose=true "Vidal MPSs" begin
     N = 8
     s = siteinds("S=1/2", N)
     x = random_mps(ComplexF64, s; linkdims=4)
@@ -183,7 +183,47 @@ end
     x_vidal = convert(VidalMPS, x)
     y_vidal = convert(VidalMPS, y)
 
-    @test dot(x_vidal, y_vidal) ≈ conj(dot(y_vidal, x_vidal))
-    @test dot(x_vidal, y_vidal) ≈ dot(x, y)
-    @test norm(x_vidal) ≈ norm(x)
+    @testset "Inner product and norm" begin
+        @test dot(x_vidal, y_vidal) ≈ conj(dot(y_vidal, x_vidal))
+        @test dot(x_vidal, y_vidal) ≈ dot(x, y)
+        @test norm(x_vidal) ≈ norm(x)
+    end
+
+    @testset "Application of one-site operators" begin
+        a = random_itensor(s[1], s[1]')
+        @test convert(MPS, apply(a, x_vidal)) ≈ apply(a, x)
+
+        b = random_itensor(s[3], s[3]')
+        @test convert(MPS, apply(b, x_vidal)) ≈ apply(b, x)
+
+        c = random_itensor(s[N], s[N]')
+        @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
+    end
+
+    @testset "Application of two-site operators" begin
+        a = random_itensor(s[1], s[2], s[1]', s[2]')
+        @test convert(MPS, apply(a, x_vidal)) ≈ apply(a, x)
+
+        b = random_itensor(s[2], s[3], s[2]', s[3]')
+        @test convert(MPS, apply(b, x_vidal)) ≈ apply(b, x)
+
+        c = random_itensor(s[N - 1], s[N], s[N - 1]', s[N]')
+        @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
+
+        d = random_itensor(s[2], s[4], s[2]', s[4]')
+        # The tensor indices are not contiguous site indices. The apply function should
+        # throw an error in this case.
+        @test_throws ErrorException apply(d, x_vidal)
+    end
+
+    @testset "Application of three-site operators" begin
+        a = random_itensor(s[1], s[2], s[3], s[1]', s[2]', s[3]')
+        @test convert(MPS, apply(a, x_vidal)) ≈ apply(a, x)
+
+        b = random_itensor(s[2], s[3], s[4], s[2]', s[3]', s[4]')
+        @test convert(MPS, apply(b, x_vidal)) ≈ apply(b, x)
+
+        c = random_itensor(s[N - 2], s[N - 1], s[N], s[N - 2]', s[N - 1]', s[N]')
+        @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
+    end
 end
