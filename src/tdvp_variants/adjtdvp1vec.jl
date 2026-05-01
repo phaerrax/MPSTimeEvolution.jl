@@ -182,7 +182,7 @@ function adjtdvp1vec!(
             end
 
             if !isnothing(ranks_handle)
-            println(ranks_handle, join([current_time; linkdims(operator)], ","))
+                println(ranks_handle, join([current_time; linkdims(operator)], ","))
                 flush(ranks_handle)
             end
 
@@ -348,25 +348,25 @@ function adaptiveadjtdvp1vec!(
         # If it is so, then we go on and compute the expectation value (and update prev_t).
         if (current_time - prev_t ≈ meas_stride || current_time == 0)
             if !isnothing(io_handle)
-            data = [current_time]
+                data = [current_time]
 
-            expvals = [inner(s, operator) for s in initialstates]
-            for x in expvals
-                push!(data, real(x), imag(x))
+                expvals = [inner(s, operator) for s in initialstates]
+                for x in expvals
+                    push!(data, real(x), imag(x))
+                end
+
+                println(io_handle, join(data, ","))
+                flush(io_handle)
             end
 
-            println(io_handle, join(data, ","))
-            flush(io_handle)
-        end
-
             if !isnothing(ranks_handle)
-            println(ranks_handle, join([current_time; linkdims(operator)], ","))
-            flush(ranks_handle)
-        end
+                println(ranks_handle, join([current_time; linkdims(operator)], ","))
+                flush(ranks_handle)
+            end
 
             if !isnothing(times_handle)
-            printoutput_stime(times_handle, stime)
-        end
+                printoutput_stime(times_handle, stime)
+            end
 
             prev_t = current_time
         end

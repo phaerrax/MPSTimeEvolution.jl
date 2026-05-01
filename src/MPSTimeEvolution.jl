@@ -41,11 +41,11 @@ include("tdvp_variants/adjtdvp1vec.jl")
 include("tdvp_variants/tdvp_other.jl")
 include("tdvp_variants/jointtdvp1.jl")
 
-include("mps_vidal_definition.jl")
-include("mps_vidal_indices.jl")
-include("mps_vidal_algebra.jl")
-include("mps_vidal_to_mps.jl")
-include("mps_vidal_apply.jl")
+include("vidalmps/definition.jl")
+include("vidalmps/indices.jl")
+include("vidalmps/algebra.jl")
+include("vidalmps/to_mps.jl")
+include("vidalmps/apply.jl")
 
 include("physical_systems.jl")
 

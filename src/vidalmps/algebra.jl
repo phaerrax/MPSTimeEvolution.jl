@@ -85,19 +85,22 @@ function ITensorMPS.truncate!(
 )
     site_ts = site_tensors(ψ)
     bond_ts = bond_tensors(ψ)
+
     # Perform truncations from left to right.
     for j in first(site_range):(last(site_range) - 1)
-        linds = uniqueinds(site_ts[j], bond_ts[j] * site_ts[j + 1])
-        ltags = tags(commonind(site_ts[j], bond_ts[j] * site_ts[j + 1]))
-        rtags = tags(commonind(site_ts[j] * bond_ts[j], site_ts[j + 1]))
-        U, S, V, spec = svd(
-            site_ts[j] * bond_ts[j], linds; lefttags=ltags, righttags=rtags, kwargs...
+        M = site_ts[j] * bond_ts[j] * site_ts[j + 1]
+
+        linds = uniqueinds(site_ts[j], bond_ts[j])
+        ltags = tags(commonind(site_ts[j], bond_ts[j]))
+        rtags = tags(commonind(bond_ts[j], site_ts[j + 1]))
+
+        site_ts[j], bond_ts[j], site_ts[j + 1], spec = svd(
+            M, linds; lefttags=ltags, righttags=rtags, kwargs...
         )
-        site_ts[j] = U
-        bond_ts[j] = S
-        site_ts[j + 1] *= V
+
         callback(; link=(j => j - 1), truncation_error=spec.truncerr)
     end
+
     return ψ
 end
 
