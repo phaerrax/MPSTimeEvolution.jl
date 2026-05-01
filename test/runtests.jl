@@ -226,4 +226,9 @@ end
         c = random_itensor(s[N - 2], s[N - 1], s[N], s[N - 2]', s[N - 1]', s[N]')
         @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
     end
+
+    @testset "Arithmetic operations" begin
+        @test dot(x_vidal, x_vidal + y_vidal) ≈
+            dot(x_vidal, x_vidal) + dot(x_vidal, y_vidal)
+    end
 end

@@ -106,3 +106,130 @@ function ITensorMPS.truncate(ψ0::VidalMPS; kwargs...)
     truncate!(ψ; kwargs...)
     return ψ
 end
+
+### Sums of MPSs
+
+"""
+    +(A::VidalMPS...; kwargs...)
+    add(A::VidalMPS...; kwargs...)
+
+Add arbitrary numbers of `VidalMPS` with each other.
+
+The function uses the "direct sum" algorithm, that performs a direct sum of each tensors on
+each site of the input `VidalMPS` being summed. It doesn't perform any truncation, and the
+bond dimension of the output is the sum of the bond dimensions of the inputs. You can
+truncate the resulting MPS with the `truncate!` function.
+
+# Examples
+
+```julia
+N = 10
+s = siteinds("S=1/2", N)
+
+state = n -> isodd(n) ? "↑" : "↓"
+ψ₁ = convert(VidalMPS, random_mps(s, state; linkdims = 2))
+ψ₂ = convert(VidalMPS, random_mps(s, state; linkdims = 2))
+ψ₃ = convert(VidalMPS, random_mps(s, state; linkdims = 2))
+
+ψ = +(ψ₁, ψ₂)
+ψ = ψ₁ + ψ₂
+
+println()
+@show inner(ψ, ψ)
+@show inner(ψ₁, ψ₂) + inner(ψ₁, ψ₂) + inner(ψ₂, ψ₁) + inner(ψ₂, ψ₂)
+
+# Computes ψ₁ + 2ψ₂
+ψ = ψ₁ + 2ψ₂
+
+println()
+@show inner(ψ, ψ)
+@show inner(ψ₁, ψ₁) + 2 * inner(ψ₁, ψ₂) + 2 * inner(ψ₂, ψ₁) + 4 * inner(ψ₂, ψ₂)
+
+# Computes ψ₁ + 2ψ₂ + ψ₃
+ψ = ψ₁ + 2ψ₂ + ψ₃
+
+println()
+@show inner(ψ, ψ)
+@show inner(ψ₁, ψ₁) + 2 * inner(ψ₁, ψ₂) + inner(ψ₁, ψ₃) +
+      2 * inner(ψ₂, ψ₁) + 4 * inner(ψ₂, ψ₂) + 2 * inner(ψ₂, ψ₃) +
+      inner(ψ₃, ψ₁) + 2 * inner(ψ₃, ψ₂) + inner(ψ₃, ψ₃)
+```
+"""
+function Base.:(+)(ψs::VidalMPS...; cutoff=1e-15, kwargs...)
+    @assert allequal(nsites, ψs)
+    n = nsites(first(ψs))
+
+    # Output tensors:
+    sum_site_ts = Vector{ITensor}(undef, n)
+    sum_bond_ts = Vector{ITensor}(undef, n-1)
+
+    # First tensor of the direct sum:
+    Γ₁, (r₁,) = directsum(
+        (site_tensors(ψᵢ)[1] => (rightlinkind(ψᵢ, 1),) for ψᵢ in ψs)...;
+        tags=[tags(rightlinkind(first(ψs), 1))],
+    )
+    # Γ₁ is the direct sum of the site_tensors(ψᵢ)[1]'s over the link indices: it will have
+    # the site index shared by all the site_tensors(ψᵢ)[1]s, and a link index that runs over
+    # all their link indices.
+    # r₁ is the new collective (right) link index (the new indices are returned as a tuple
+    # --- there may be more than one, as we will se later --- so we write (r₁,) to extract
+    # r₁ from the tuple).
+
+    prev_link_inds = r₁  # The link indices of the previous site
+    sum_site_ts[1] = Γ₁  # Set the first tensor in the output Vidal MPS
+
+    for j in 1:(n - 2)
+        # Repeat the direct sum on the other sites. In this loop we have two sets of link
+        # indices we need to group.
+
+        # Bond tensors:
+        Λⱼ, (rⱼ, lⱼ₊₁) = directsum(
+            (
+                bond_tensors(ψᵢ)[j] => (rightlinkind(ψᵢ, j), leftlinkind(ψᵢ, j+1)) for
+                ψᵢ in ψs
+            )...;
+            tags=[tags(rightlinkind(first(ψs), j)), tags(leftlinkind(first(ψs), j+1))],
+        )
+        Λⱼ = replaceind(Λⱼ, rⱼ => dag(prev_link_inds))
+        prev_link_inds = lⱼ₊₁
+        sum_bond_ts[j] = Λⱼ
+
+        # Site tensors:
+        Γⱼ₊₁, (lⱼ₊₁, rⱼ₊₁) = directsum(
+            (
+                site_tensors(ψᵢ)[j + 1] => (leftlinkind(ψᵢ, j+1), rightlinkind(ψᵢ, j+1)) for
+                ψᵢ in ψs
+            )...;
+            tags=[tags(leftlinkind(first(ψs), j + 1)), tags(rightlinkind(first(ψs), j+1))],
+        )
+        Γⱼ₊₁ = replaceind(Γⱼ₊₁, lⱼ₊₁ => dag(prev_link_inds))
+        prev_link_inds = rⱼ₊₁
+        sum_site_ts[j + 1] = Γⱼ₊₁
+    end
+
+    # Last bond tensor:
+    Λₙ₋₁, (rₙ₋₁, lₙ) = directsum(
+        (
+            bond_tensors(ψᵢ)[n - 1] => (rightlinkind(ψᵢ, n-1), leftlinkind(ψᵢ, n)) for
+            ψᵢ in ψs
+        )...;
+        tags=[tags(rightlinkind(first(ψs), n-1)), tags(leftlinkind(first(ψs), n))],
+    )
+    Λₙ₋₁ = replaceind(Λₙ₋₁, rₙ₋₁ => dag(prev_link_inds))
+    prev_link_inds = lₙ
+    sum_bond_ts[n - 1] = Λₙ₋₁
+
+    # Last site tensor. Here once again we have just one set of link indices.
+    Γₙ, (lₙ,) = directsum(
+        (site_tensors(ψᵢ)[n] => (leftlinkind(ψᵢ, n),) for ψᵢ in ψs)...;
+        tags=[tags(leftlinkind(first(ψs), n))],
+    )
+    Γₙ = replaceind(Γₙ, lₙ => dag(prev_link_inds))
+    sum_site_ts[n] = Γₙ
+
+    return VidalMPS(sum_site_ts, sum_bond_ts)
+end
+
+Base.:(+)(ψ::VidalMPS) = ψ
+
+ITensorMPS.add(ψs::VidalMPS...; kwargs...) = +(ψs...; kwargs...)
