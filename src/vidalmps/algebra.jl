@@ -41,16 +41,33 @@ end
 
 Compute the norm of the `VidalMPS`.
 """
-function LinearAlgebra.norm(ψ::VidalMPS)
+function LinearAlgebra.norm(ψ::VidalMPS; neg_atol=eps(real(NDTensors.scalartype(ψ))) * 10)
     norm2_ψ = dot(ψ, ψ)
     rtol = eps(real(NDTensors.scalartype(ψ))) * 10
     atol = rtol
+
     if !IsApprox.isreal(norm2_ψ, IsApprox.Approx(; rtol=rtol, atol=atol))
         @warn "norm² is $norm2_ψ, which is not real up to a relative tolerance of " *
             "$rtol and an absolute tolerance of $atol. Taking the real part, which " *
             "may not be accurate."
     end
-    return sqrt(real(norm2_ψ))
+    norm2_ψ = real(norm2_ψ)
+
+    # Sometimes it happens that ⟨ψ, ψ⟩ is slightly below zero (~1e-16, always within
+    # numerical accuracy), likely because of some rounding inaccuracies.
+    # UGLY HACK: check whether ⟨ψ, ψ⟩ < 0 within some small error, and if so return zero,
+    # otherwise throw a genuine error.
+    if norm2_ψ < 0
+        if abs(norm2_ψ) < neg_atol
+            norm2_ψ = zero(norm2_ψ)
+        else
+            error(
+                "norm² is $norm2_ψ, which is negative beyond an absolute tolerance of $neg_atol.",
+            )
+        end
+    end
+
+    return sqrt(norm2_ψ)
 end
 
 ### Truncation
