@@ -1,3 +1,5 @@
+using NDTensors.BackendSelection: @Algorithm_str, Algorithm
+
 ### Inner products
 
 function LinearAlgebra.dot(ψ1::VidalMPS, ψ2::VidalMPS)::Number
@@ -133,12 +135,22 @@ end
     +(A::VidalMPS...; kwargs...)
     add(A::VidalMPS...; kwargs...)
 
-Add arbitrary numbers of `VidalMPS` with each other.
+Add arbitrary numbers of `VidalMPS` with each other, optionally truncating the results.
 
-The function uses the "direct sum" algorithm, that performs a direct sum of each tensors on
-each site of the input `VidalMPS` being summed. It doesn't perform any truncation, and the
-bond dimension of the output is the sum of the bond dimensions of the inputs. You can
-truncate the resulting MPS with the `truncate!` function.
+A cutoff of 1e-15 is used by default, and in general users should set their own cutoff for
+their particular application.
+
+# Keywords
+
+- `cutoff::Real`: singular value truncation cutoff
+- `maxdim::Int`: maximum MPS bond dimension
+- `alg = "densitymatrix"`: `"densitymatrix"` or `"directsum"`. `"densitymatrix"` adds the
+  MPSs by adding up and diagonalizing local density matrices site by site in a single sweep
+  through the system, truncating the density matrix with `cutoff` and `maxdim`.
+  `"directsum"` performs a direct sum of each tensors on each site of the input MPS being
+  summed. It doesn't perform any truncation, and therefore ignores `cutoff` and `maxdim`.
+  The bond dimension of the output is the sum of the bond dimensions of the inputs. You can
+  truncate the resulting MPS with the `truncate!` function.
 
 # Examples
 
@@ -175,7 +187,11 @@ println()
       inner(ψ₃, ψ₁) + 2 * inner(ψ₃, ψ₂) + inner(ψ₃, ψ₃)
 ```
 """
-function Base.:(+)(ψs::VidalMPS...; cutoff=1e-15, kwargs...)
+function Base.:(+)(ψs::VidalMPS...; alg=Algorithm"densitymatrix"(), kwargs...)
+    return +(Algorithm(alg), ψs...; kwargs...)
+end
+
+function Base.:(+)(::Algorithm"directsum", ψs::VidalMPS...)
     @assert allequal(nsites, ψs)
     n = nsites(first(ψs))
 
@@ -248,6 +264,15 @@ function Base.:(+)(ψs::VidalMPS...; cutoff=1e-15, kwargs...)
     sum_site_ts[n] = Γₙ
 
     return VidalMPS(sum_site_ts, sum_bond_ts)
+end
+
+function Base.:(+)(::Algorithm"densitymatrix", ψs::VidalMPS...; cutoff=1e-15, kwargs...)
+    return convert(
+        VidalMPS,
+        sum([convert(MPS, ψ) for ψ in ψs]; cutoff=cutoff, kwargs...);
+        cutoff=cutoff,
+        kwargs...,
+    )
 end
 
 Base.:(+)(ψ::VidalMPS) = ψ
