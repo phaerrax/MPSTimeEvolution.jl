@@ -183,10 +183,22 @@ end
     x_vidal = convert(VidalMPS, x)
     y_vidal = convert(VidalMPS, y)
 
+    @testset "Arithmetic operations" begin
+        @test 2x_vidal ≈ x_vidal + x_vidal
+        @test x_vidal + y_vidal - x_vidal ≈ y_vidal
+        @test y_vidal / 4 ≈ 0.25 * y_vidal
+    end
+
     @testset "Inner product and norm" begin
         @test dot(x_vidal, y_vidal) ≈ conj(dot(y_vidal, x_vidal))
         @test dot(x_vidal, y_vidal) ≈ dot(x, y)
         @test norm(x_vidal) ≈ norm(x)
+        @test norm(-x_vidal) ≈ norm(x_vidal)
+
+        λ = 3.5im
+        @test dot(λ * x_vidal, y_vidal) ≈ conj(λ) * dot(x_vidal, y_vidal)
+        @test dot(x_vidal, x_vidal - y_vidal) ≈
+            dot(x_vidal, x_vidal) - dot(x_vidal, y_vidal)
     end
 
     @testset "Application of one-site operators" begin
@@ -225,10 +237,5 @@ end
 
         c = random_itensor(s[N - 2], s[N - 1], s[N], s[N - 2]', s[N - 1]', s[N]')
         @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
-    end
-
-    @testset "Arithmetic operations" begin
-        @test dot(x_vidal, x_vidal + y_vidal) ≈
-            dot(x_vidal, x_vidal) + dot(x_vidal, y_vidal)
     end
 end

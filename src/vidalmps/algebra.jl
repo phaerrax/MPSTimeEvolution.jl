@@ -275,6 +275,49 @@ function Base.:(+)(::Algorithm"densitymatrix", ψs::VidalMPS...; cutoff=1e-15, k
     )
 end
 
+ITensorMPS.add(ψs::VidalMPS...; kwargs...) = +(ψs...; kwargs...)
+
+function scalarmult!(ψ::VidalMPS, a::Number)
+    # Multiplying the MPS by a is equivalent to multiplying one of its tensors by a.
+    # However, in order to preserve the Vidal form, the bond tensors must contain
+    # non-negative values only, and the site tensors have some orthogonality conditions to
+    # satisfy. Thus, we multiply the last of the bond tensors by |a| and the last site
+    # tensor by exp(i*arg(a)), which means that we multiply the vectors associated to the
+    # singular values (of the last bond tensor) by a unit complex number. This should be
+    # okay.
+    st = site_tensors(ψ)
+    bt = bond_tensors(ψ)
+    st[end] *= cis(angle(a))
+    bt[end] *= abs(a)
+    return ψ
+end
+
+function scalarmult(ψ::VidalMPS, a::Number)
+    return scalarmult!(copy(ψ), a)
+end
+
+Base.:(*)(ψ::VidalMPS, a::Number) = scalarmult(ψ, a)
+Base.:(*)(a::Number, ψ::VidalMPS) = scalarmult(ψ, a)
+
 Base.:(+)(ψ::VidalMPS) = ψ
 
-ITensorMPS.add(ψs::VidalMPS...; kwargs...) = +(ψs...; kwargs...)
+Base.:(-)(ψ::VidalMPS) = scalarmult(ψ, -1)
+Base.:(-)(ψ::VidalMPS, ϕ::VidalMPS) = +(ψ, -ϕ)
+
+Base.:(/)(ψ::VidalMPS, a::Number) = scalarmult(ψ, inv(a))
+
+function Base.isapprox(
+    x::VidalMPS,
+    y::VidalMPS;
+    atol::Real=0,
+    rtol::Real=Base.rtoldefault(
+        LinearAlgebra.promote_leaf_eltypes(x), LinearAlgebra.promote_leaf_eltypes(y), atol
+    ),
+)
+    d = norm(x - y)
+    if isfinite(d)
+        return d <= max(atol, rtol * max(norm(x), norm(y)))
+    else
+        error("In `isapprox(x::VidalMPS, y::VidalMPS)`, `norm(x - y)` is not finite")
+    end
+end

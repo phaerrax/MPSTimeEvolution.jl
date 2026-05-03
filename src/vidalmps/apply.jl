@@ -19,8 +19,8 @@ function _replace_and_decompose!(ψ::VidalMPS, M::ITensor; kwargs...)
     #    dangling on the left.
 
     # 3. Recursively decompose A with an SVD, until we exhaust the site indices.
-    site_ts=site_tensors(ψ)
-    bond_ts=bond_tensors(ψ)
+    site_ts = site_tensors(ψ)
+    bond_ts = bond_tensors(ψ)
 
     linds = if ns[1] > 1
         commoninds(M, bond_ts[ns[1] - 1] * site_ts[ns[1]])
