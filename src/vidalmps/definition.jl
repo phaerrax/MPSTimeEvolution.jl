@@ -203,3 +203,28 @@ function LinearAlgebra.promote_leaf_eltypes(ψ::VidalMPS)
     return LinearAlgebra.promote_leaf_eltypes([site_tensors(ψ); bond_tensors(ψ)])
 end
 NDTensors.scalartype(ψ::VidalMPS) = LinearAlgebra.promote_leaf_eltypes(ψ)
+
+# Compact printing of MPS contents on the REPL (otherwise it dumps the contents of _all_ the
+# tensors, creating a huge output)
+function Base.show(io::IO, ψ::VidalMPS)
+    print(io, "VidalMPS ($(nsites(ψ)) sites)")
+    return nothing
+end
+
+function Base.show(io::IO, ::MIME"text/plain", ψ::VidalMPS)
+    println(io, "$(nsites(ψ))-site VidalMPS:")
+    st = site_tensors(ψ)
+    bt = bond_tensors(ψ)
+    siteinds_vec = map(eachindex(st)) do j
+        !isassigned(st, j) && return ITensorMPS.Undef()
+        return inds(st[j])
+    end
+    bondinds_vec = map(eachindex(bt)) do j
+        !isassigned(bt, j) && return ITensorMPS.Undef()
+        return inds(bt[j])
+    end
+    Base.print_array(
+        io, [collect(Iterators.flatten(zip(siteinds_vec, bondinds_vec))); siteinds_vec[end]]
+    )
+    return nothing
+end
