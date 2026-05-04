@@ -238,4 +238,14 @@ end
         c = random_itensor(s[N - 2], s[N - 1], s[N], s[N - 2]', s[N - 1]', s[N]')
         @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
     end
+
+    @testset "Expectation values" begin
+        @test expect(x, "S²") ≈ expect(x_vidal, "S²")
+
+        m = [1 im; 1+1im 0]
+        @test expect(x, m) ≈ expect(x_vidal, m)
+
+        @test expect(y, "ProjDn"; sites=3:N) ≈ expect(y_vidal, "ProjDn"; sites=3:N)
+        @test expect(x, ["Sx", "Sy", "Sz"]) ≈ expect(x_vidal, ["Sx", "Sy", "Sz"])
+    end
 end

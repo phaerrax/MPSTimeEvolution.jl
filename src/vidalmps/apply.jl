@@ -126,3 +126,85 @@ function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
 
     return ψ
 end
+
+"""
+    expect(ψ::VidalMPS, op::AbstractString...; kwargs...)
+    expect(ψ::VidalMPS, op::Matrix{<:Number}...; kwargs...)
+    expect(ψ::VidalMPS, ops; kwargs...)
+
+Given a `VidalMPS` `ψ` and a single operator name, returns a vector of the expected value of
+the operator on each site of the MPS.
+
+See [ITensorMPS.expect](@ref) for more details.
+"""
+function ITensorMPS.expect(ψ::VidalMPS, ops; sites=1:nsites(ψ))
+    ψ = copy(ψ)
+    N = nsites(ψ)
+    ElT = NDTensors.scalartype(ψ)
+    s = siteinds(ψ)
+
+    site_range = (sites isa AbstractRange) ? sites : collect(sites)
+    Ns = length(site_range)
+    start_site = first(site_range)
+
+    el_types = map(o -> ishermitian(op(o, s[start_site])) ? real(ElT) : ElT, ops)
+
+    norm2_ψ = norm(ψ)^2
+    iszero(norm2_ψ) && error("VidalMPS has zero norm in function `expect`")
+
+    ex = map((o, el_t) -> zeros(el_t, Ns), ops, el_types)
+    for (entry, j) in enumerate(site_range)
+        for (n, opname) in enumerate(ops)
+            oⱼ = Adapt.adapt(
+                unspecify_type_parameters(NDTensors.datatype(site_tensors(ψ)[j])),
+                op(opname, s[j]),
+            )
+            # From the docs: "The `adapt(T, x)` function acts like `convert(T, x)`, but
+            # without the restriction of returning a `T`." From the code of the Adapt
+            # package, if `T` is `Array` and `xs` is an `AbstractArray`, the call boils down
+            # to `convert(Array, xs)`, so basically it converts `xs` to a concrete `Array`.
+            # (Not really sure what is the purpose here...)
+            #
+            # `unspecify_type_parameters` is a function from the TypeParameterAccessors
+            # package that removes the parameters of a type (a type parameter is the thing
+            # inside braces after a type, for example `Int` in `Vector{Int}`). Examples:
+            # `Array{ITensors}` becomes `Array`, and `Vector{Real}` becomes `Vector`.
+
+            val = inner(ψ, apply(oⱼ, ψ)) / norm2_ψ
+            # Here ITensorMPS can optimise the calculation, because at this point of the
+            # function the MPS is orthogonalised on site `j`.  They can call the `inner`
+            # method on the ITensor `ψ[j]` only instead of the whole MPS, i.e.
+            #   inner(ψ[j], apply(oⱼ, ψ[j])) / norm2_ψ
+            # that ignores the other site tensors completely (they cancel out due to their
+            # left- or right-canonicity).
+            # Here we do not have (yet!) such cancellation rules, so we must contract the
+            # full MPS, which is of course wasteful.
+            ex[n][entry] = (el_types[n] <: Real) ? real(val) : val
+        end
+    end
+
+    if sites isa Number
+        return map(arr -> only(arr), ex)
+    end
+    return ex
+end
+
+function ITensorMPS.expect(ψ::VidalMPS, op::AbstractString; kwargs...)
+    return first(expect(ψ, (op,); kwargs...))
+end
+
+function ITensorMPS.expect(ψ::VidalMPS, op::Matrix{<:Number}; kwargs...)
+    return first(expect(ψ, (op,); kwargs...))
+end
+
+function ITensorMPS.expect(
+    ψ::VidalMPS, op1::AbstractString, ops::AbstractString...; kwargs...
+)
+    return expect(ψ, (op1, ops...); kwargs...)
+end
+
+function ITensorMPS.expect(
+    ψ::VidalMPS, op1::Matrix{<:Number}, ops::Matrix{<:Number}...; kwargs...
+)
+    return expect(ψ, (op1, ops...); kwargs...)
+end
