@@ -53,9 +53,12 @@ end
 Compute the norm of the `VidalMPS`.
 """
 function LinearAlgebra.norm(ψ::VidalMPS; neg_atol=eps(real(NDTensors.scalartype(ψ))) * 10)
-    norm2_ψ = dot(ψ, ψ)
     rtol = eps(real(NDTensors.scalartype(ψ))) * 10
     atol = rtol
+
+    M₁ = site_tensors(ψ)[1] * bond_tensors(ψ)[1]
+    contr_post = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[2:end]; init=1.0)
+    norm2_ψ = contr_post * inner(M₁, M₁)
 
     if !IsApprox.isreal(norm2_ψ, IsApprox.Approx(; rtol=rtol, atol=atol))
         @warn "norm² is $norm2_ψ, which is not real up to a relative tolerance of " *
