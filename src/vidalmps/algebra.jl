@@ -112,28 +112,62 @@ function ITensorMPS.truncate!(
     ψ::VidalMPS; site_range=1:nsites(ψ), callback=Returns(nothing), kwargs...
 )
     site_ts = site_tensors(ψ)
-    bond_ts = bond_tensors(ψ)
+    bond_ts = OffsetArray([ITensor(1.0); bond_tensors(ψ); ITensor(1.0)], 0:nsites(ψ))
+    # Let's try this new thing here first: we add a trivial bond tensor to the left of
+    # Γ₁ and to the right of Γₙ, so that there are n+1 bond tensors in total.
+    # When we truncate the (j, j+1) bond we need to incorporate Λⱼ₋₁ and Λⱼ₊₁ in the
+    # tensor we want to decompose and truncate, so these trivial bond tensors might help us
+    # write a simpler code, without having to discriminate the j=1 and j=N-1 case each time
+    # (where normally there wouldn't be both bond tensors on the left and on the right).
+    # We use ITensor(1.0) instead of OneITensor() because we need to call `inv.` on it, and
+    # there's no such method for OneITensors.
+    # TODO: try this logic everywhere for the VidalMPS type?
 
-    # Perform truncations from left to right.
-    for j in first(site_range):(last(site_range) - 1)
-        M = site_ts[j] * bond_ts[j] * site_ts[j + 1]
+    # We perform truncations from right to left. This is how ITensor does it, and how we
+    # should implement it if we want the results to match, i.e. if we want that
+    #   truncate(v::MPS; ...) ≈ truncate(convert(VidalMPS, v); ...)
+    # for the same `site_range`, `cutoff` and `maxdim` on both sides.
+    #
+    # TODO: find out why left-to-right and right-to-left truncation sequences do not yield
+    # equivalent MPSs, either in the standard or in the Vidal form.
+    for j in reverse((first(site_range) + 1):last(site_range))
+        M = bond_ts[j - 2] * site_ts[j - 1] * bond_ts[j - 1] * site_ts[j] * bond_ts[j]
+        # inds(M) = (rⱼ₋₁, sⱼ, sⱼ₊₁, lⱼ₊₁)
+        # (except if j == 1 or j == N-1, then there's one bond index less).
+        #
+        # Even if j-1 == 0 or j+1 == N we don't need to worry, because the trivial
+        # tensors will be picked up instead of getting an error because the index is out of
+        # bounds.
 
-        linds = uniqueinds(site_ts[j], bond_ts[j])
-        ltags = tags(commonind(site_ts[j], bond_ts[j]))
-        rtags = tags(commonind(bond_ts[j], site_ts[j + 1]))
+        rinds = uniqueinds(M, bond_ts[j - 2]*site_ts[j - 1])
+        rtags = tags(commonind(site_ts[j], bond_ts[j - 1]))
+        ltags = tags(commonind(site_ts[j - 1], bond_ts[j - 1]))
+        # rinds = (sⱼ, rⱼ)
+        # rtags = "Link,l=j"
+        # ltags = "Link,r=j-1"
 
-        site_ts[j], bond_ts[j], site_ts[j + 1], spec = svd(
-            M, linds; lefttags=ltags, righttags=rtags, kwargs...
+        U, bond_ts[j - 1], V, spec = svd(
+            M, rinds; lefttags=ltags, righttags=rtags, kwargs...
         )
 
         callback(; link=(j => j - 1), truncation_error=spec.truncerr)
+
+        # Restore the Vidal form by "removing" the singular values we previously
+        # incorporated.
+        site_ts[j] = inv.(bond_ts[j]) * U
+        site_ts[j - 1] = V * inv.(bond_ts[j - 2])
     end
+
+    # We need to reassign the bond tensors to ψ because in creating the OffsetArray at the
+    # beginning we made a copy of the bond tensors, so ψ's bond tensors haven't actually
+    # been modified until now.
+    ψ.bond_tensors = bond_ts[1:(nsites(ψ) - 1)]
 
     return ψ
 end
 
-function ITensorMPS.truncate(ψ0::VidalMPS; kwargs...)
-    ψ = copy(ψ0)
+function ITensorMPS.truncate(ψ₀::VidalMPS; kwargs...)
+    ψ = copy(ψ₀)
     truncate!(ψ; kwargs...)
     return ψ
 end

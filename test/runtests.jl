@@ -183,6 +183,19 @@ end
     x_vidal = convert(VidalMPS, x)
     y_vidal = convert(VidalMPS, y)
 
+    @testset "Truncation" begin
+        s′ = siteinds("Boson", N; dim=6)
+        # We need bigger site indices so that we have more room for truncation.
+        z = random_mps(ComplexF64, s′; linkdims=4)
+        z_vidal = convert(VidalMPS, z)
+        maxdim = 10
+        cutoff = 1e-8
+        @test truncate(z; maxdim=maxdim, site_range=3:4) ≈
+            convert(MPS, truncate(z_vidal; maxdim=maxdim, site_range=3:4))
+        @test truncate(z; cutoff=cutoff) ≈ convert(MPS, truncate(z_vidal; cutoff=cutoff))
+        @test truncate(z; maxdim=maxdim) ≈ convert(MPS, truncate(z_vidal; maxdim=maxdim))
+    end
+
     @testset "Arithmetic operations" begin
         @test 2x_vidal ≈ x_vidal + x_vidal
         @test x_vidal + y_vidal - x_vidal ≈ y_vidal

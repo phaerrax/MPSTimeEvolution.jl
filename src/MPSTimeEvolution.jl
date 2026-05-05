@@ -8,6 +8,7 @@ using ITensorMPS
 using IterTools
 using IsApprox
 using LinearAlgebra
+using OffsetArrays
 using OrderedCollections
 using Memoize
 using KrylovKit: exponentiate
