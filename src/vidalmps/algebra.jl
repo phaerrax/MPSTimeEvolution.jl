@@ -271,7 +271,15 @@ function Base.:(+)(::Algorithm"directsum", ψs::VidalMPS...)
         )
         Λⱼ = replaceind(Λⱼ, rⱼ => dag(prev_link_inds))
         prev_link_inds = lⱼ₊₁
-        sum_bond_ts[j] = Λⱼ
+        sum_bond_ts[j] = diag_itensor(vector(diag(Λⱼ)), inds(Λⱼ)...)
+        # If we just wrote
+        #   sum_bond_ts[j] = Λⱼ
+        # then we would get a dense tensor, which is the wrong choice since we often take
+        # the inverse of the bond tensors Λ with `inv.(Λ)`. If Λ is dense (i.e. a normal
+        # ITensor), then the inverse is actually taken componentwise due to the
+        # broadcasting, and consequently we get a load of Infs and NaNs in our calculations.
+        # If we convert the Λs to diagonal ITensors instead, the `inv.` method doesn't touch
+        # the elements out of the diagonal, and gives us the actual matrix inverse of Λ.
 
         # Site tensors:
         Γⱼ₊₁, (lⱼ₊₁, rⱼ₊₁) = directsum(
@@ -296,7 +304,7 @@ function Base.:(+)(::Algorithm"directsum", ψs::VidalMPS...)
     )
     Λₙ₋₁ = replaceind(Λₙ₋₁, rₙ₋₁ => dag(prev_link_inds))
     prev_link_inds = lₙ
-    sum_bond_ts[n - 1] = Λₙ₋₁
+    sum_bond_ts[n - 1] = diag_itensor(vector(diag(Λₙ₋₁)), inds(Λₙ₋₁)...)
 
     # Last site tensor. Here once again we have just one set of link indices.
     Γₙ, (lₙ,) = directsum(
