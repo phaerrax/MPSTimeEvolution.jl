@@ -127,6 +127,85 @@ function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
     return ψ
 end
 
+function simplified_self_contraction(ψ::VidalMPS, A::ITensor, j)
+    # Compute ⟨ψ, Aψ⟩ by contracting only the site tensor on which A acts (we could deduce
+    # site_n from A, but we already know it anyway when we call this function, so let's use
+    # it).  If the opposite tensors are directly contracted with each other, the following
+    # cancellation rules hold:
+    #
+    #   Γ[1]───       ╭───
+    #    │            │
+    #    │        =   │
+    #    │            │
+    #   Γ[1]───       ╰───
+    #
+    #
+    #   ───Γ[N]       ───╮
+    #       │            │
+    #       │     =      │
+    #       │            │
+    #   ───Γ[N]       ───╯
+    #
+    #
+    #  ╭───Λ[k-1]───Γ[k]───                       ╭───
+    #  │             │                            │
+    #  │             │        =  tr(Λ[k-1]²)  ×   │
+    #  │             │                            │
+    #  ╰───Λ[k-1]───Γ[k]───                       ╰───
+    #
+    #
+    #   ───Γ[k]───Λ[k]───╮                     ───╮
+    #       │            │                        │
+    #       │            │   =  tr(Λ[k]²)  ×      │
+    #       │            │                        │
+    #   ───Γ[k]───Λ[k]───╯                     ───╯
+    #
+    #
+    # This means that we don't actually need to compute the full contraction:
+    #
+    #     ○──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──○
+    #     │     │     │         │     │     │         │     │     │
+    #     │     │     │         │     □     │         │     │     │  =
+    #     │     │     │         │     │     │         │     │     │
+    #     ○──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──○
+    #     1     2     3        j-1    j    j+1       N-2   N-1    N
+    #
+    #
+    #     ╭──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──╮
+    #     │     │     │         │     │     │         │     │     │
+    #  =  │     │     │         │     □     │         │     │     │  =
+    #     │     │     │         │     │     │         │     │     │
+    #     ╰──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──╯
+    #           2     3        j-1    j    j+1       N-2   N-1
+    #
+    #
+    #           ╭──◇──○─╶╶   ╶╶─○──◇──○──◇──○─╶╶   ╶╶─○──◇──╮
+    #           │     │         │     │     │         │     │
+    #  =        │     │         │     □     │         │     │  ×  tr(Λ[1]²) tr(Λ[N-1]²)  =
+    #           │     │         │     │     │         │     │
+    #           ╰──◇──○─╶╶   ╶╶─○──◇──○──◇──○─╶╶   ╶╶─○──◇──╯
+    #                 3        j-1    j    j+1       N-2
+    #
+    #
+    #                           ╭──◇──○──◇──╮
+    #                           │     │     │
+    #  =                        │     □     │  ×  tr(Λ[1]²) ⋯ tr(Λ[j-2]²)
+    #                           │     │     │            tr(Λ[j+1]²) ⋯ tr(Λ[N-1]²).
+    #                           ╰──◇──○──◇──╯
+    #                                 j
+
+    Mⱼ = if j == nsites(ψ)
+        bond_tensors(ψ)[j - 1] * site_tensors(ψ)[j]
+    elseif j == 1
+        site_tensors(ψ)[j] * bond_tensors(ψ)[j]
+    else
+        bond_tensors(ψ)[j - 1] * site_tensors(ψ)[j] * bond_tensors(ψ)[j]
+    end
+    contr_pre = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[1:(j - 2)]; init=1.0)
+    contr_post = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[(j + 1):end]; init=1.0)
+    return contr_pre * contr_post * inner(Mⱼ, apply(A, Mⱼ))
+end
+
 """
     expect(ψ::VidalMPS, op::AbstractString...; kwargs...)
     expect(ψ::VidalMPS, op::Matrix{<:Number}...; kwargs...)
@@ -170,15 +249,7 @@ function ITensorMPS.expect(ψ::VidalMPS, ops; sites=1:nsites(ψ))
             # inside braces after a type, for example `Int` in `Vector{Int}`). Examples:
             # `Array{ITensors}` becomes `Array`, and `Vector{Real}` becomes `Vector`.
 
-            val = inner(ψ, apply(oⱼ, ψ)) / norm2_ψ
-            # Here ITensorMPS can optimise the calculation, because at this point of the
-            # function the MPS is orthogonalised on site `j`.  They can call the `inner`
-            # method on the ITensor `ψ[j]` only instead of the whole MPS, i.e.
-            #   inner(ψ[j], apply(oⱼ, ψ[j])) / norm2_ψ
-            # that ignores the other site tensors completely (they cancel out due to their
-            # left- or right-canonicity).
-            # Here we do not have (yet!) such cancellation rules, so we must contract the
-            # full MPS, which is of course wasteful.
+            val = simplified_self_contraction(ψ, oⱼ, j) / norm2_ψ
             ex[n][entry] = (el_types[n] <: Real) ? real(val) : val
         end
     end
