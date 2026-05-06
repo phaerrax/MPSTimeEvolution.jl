@@ -258,3 +258,78 @@ function Base.show(io::IO, ::MIME"text/plain", ψ::VidalMPS)
     )
     return nothing
 end
+
+function check_vidal_form(ψ::VidalMPS)
+    N = nsites(ψ)
+
+    ψdag = sim(linkinds, dag(ψ))
+    st = site_tensors(ψ)
+    bt = bond_tensors(ψ)
+    stdag = site_tensors(ψdag)
+    btdag = bond_tensors(ψdag)
+
+    # Check whether the singular values are real and not negative (excluding the trivial
+    # bond tensors at the edges).
+    for (j, Λ) in enumerate(bt[1:(N - 1)])
+        if any(!isreal, diag(Λ))
+            error("non-real singular values on bond $j.")
+        end
+        if any(<(0), diag(Λ))
+            error("negative singular values on bond $j.")
+        end
+    end
+
+    # Check whether the cancellation rules hold.
+    #
+    #   Γ[1]───       ╭───
+    #    │            │
+    #    │        =   │
+    #    │            │
+    #   Γ[1]───       ╰───
+
+    M₁ = st[1] * stdag[1]
+    if !isapprox(ITensors.matrix(M₁), I)
+        error("orthogonality condition not satisfied on site 1.")
+    end
+
+    #   ───Γ[N]       ───╮
+    #       │            │
+    #       │     =      │
+    #       │            │
+    #   ───Γ[N]       ───╯
+
+    Mₙ = st[N] * stdag[N]
+    if !isapprox(ITensors.matrix(Mₙ), I)
+        error("orthogonality condition not satisfied on site $N.")
+    end
+
+    #   ───Γ[j]───Λ[j]───╮                     ───╮
+    #       │            │                        │
+    #       │            │   =  tr(Λ[j]²)  ×      │
+    #       │            │                        │
+    #   ───Γ[j]───Λ[j]───╯                     ───╯
+
+    for j in 2:(N - 1)
+        Mⱼ = st[j] * bt[j] * stdag[j] * btdag[j]
+        Mⱼ = Mⱼ * delta(commoninds(Mⱼ, bt[j] * btdag[j]))
+        if !isapprox(ITensors.matrix(Mⱼ), scalar(bt[j] * bt[j]) * I)
+            error("orthogonality condition not satisfied on site $j.")
+        end
+    end
+
+    #  ╭───Λ[j-1]───Γ[j]───                       ╭───
+    #  │             │                            │
+    #  │             │        =  tr(Λ[j-1]²)  ×   │
+    #  │             │                            │
+    #  ╰───Λ[j-1]───Γ[j]───                       ╰───
+
+    for j in 2:(N - 1)
+        Mⱼ = bt[j - 1] * st[j] * btdag[j - 1] * stdag[j]
+        Mⱼ = Mⱼ * delta(commoninds(Mⱼ, bt[j - 1] * btdag[j - 1]))
+        if !isapprox(ITensors.matrix(Mⱼ), scalar(bt[j - 1] * bt[j - 1]) * I)
+            error("orthogonality condition not satisfied on site $j.")
+        end
+    end
+
+    return true
+end
