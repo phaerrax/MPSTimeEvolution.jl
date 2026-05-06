@@ -1,9 +1,8 @@
-function _replace_and_decompose!(ψ::VidalMPS, M::ITensor; kwargs...)
+function replace_and_decompose!(ψ::VidalMPS, M::ITensor; kwargs...)
     # Replace the sites of the Vidal MPS `ψ` with the tensor `A`, splitting up `A` into MPS
     # tensors. THE TENSORS TO BE REPLACED ARE AUTOMATICALLY DETERMINED BY A'S SITE INDICES.
-    # THIS MEANS THAT THIS FUNCTION CANNOT ACT ON THE BOND TENSORS ON THE LEFT AND ON THE
-    # RIGHT OF A. KEEP THIS IN MIND WHEN USING THIS FUNCTION WHEN APPLYING MULTI-SITE
-    # OPERATORS.
+    # THIS FUNCTION DOESN'T TAKE INTO ACCOUNT THE BOND TENSORS ON THE LEFT AND ON THE RIGHT
+    # OF A. KEEP THIS IN MIND WHEN USING THIS FUNCTION WHEN APPLYING MULTI-SITE OPERATORS.
 
     # The ITensor A will have some site indices. We need to factor it into an MPS-like form,
     # with a different site block for each site index.
@@ -72,7 +71,7 @@ function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
     # Find out if the sites are consecutive or not.
     # If they are not, we should permute the MPS sites so that they are consecutive, then
     # permute them back to their original configuration.
-    # For now, let's throw an error saying it's not implemented
+    # For now, let's throw an error saying it's not implemented.
     diff_ns = diff(ns)
     ns′ = ns
     if any(!=(1), diff_ns)
@@ -82,7 +81,9 @@ function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
     end
 
     # Multiply everything in the VidalMPS from ns′[1] to ns′[end] together, and include the
-    # bond tensors to the left of ns′[1] and to the right ns′[end].
+    # bond tensors to the left of ns′[1] and to the right of ns′[end].
+    # (This is useless, but also harmless, if `o` is a single-site operator, so we do it
+    # anyway so that the code is simpler.)
     ϕ = bond_tensors(ψ)[ns′[1] - 1] * site_tensors(ψ)[ns′[1]]
     for n in 2:N
         ϕ *= bond_tensors(ψ)[ns′[n] - 1] * site_tensors(ψ)[ns′[n]]
@@ -92,23 +93,25 @@ function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
     # Apply the operator to the combined site and bond tensors.
     ϕ = ITensors.product(o, ϕ)
 
-    # Insert the result in ψ, decomposing it into site and bond tensors.
     if length(ns) > 1
-        _replace_and_decompose!(ψ, ϕ; kwargs...)
+        # Insert the result in ψ, decomposing it into site and bond tensors...
+        replace_and_decompose!(ψ, ϕ; kwargs...)
     else
+        # ...or just replace the affected site tensor.
         site_tensors(ψ)[only(ns)] = ϕ
     end
-    # FIXME If we act on the MPS with a non-unitary single-site operator, the site tensor on
-    # which it acts will not satisfy the orthonormality rules anymore. We need a way to
-    # shift the non-unit factor to the adjacent bond tensors.
 
     # Restore the Vidal form by re-inserting the bond tensors on the left and on the right.
     # Note that the bond tensors at ns′[1] and ns′[N] from the input VidalMPS were not
-    # modified, so we don't need to "reinsert" them. We just need to multiply the first and
+    # modified, so we don't need to “reinsert” them. We just need to multiply the first and
     # last of the new site tensors.
     site_tensors(ψ)[ns′[1]] *= inv.(bond_tensors(ψ)[ns′[1] - 1])
     site_tensors(ψ)[ns′[N]] *= inv.(bond_tensors(ψ)[ns′[N]])
 
+    # If the applied operator is not unitary, it will rescale the columns/rows of the site
+    # tensors on which it acts, in such a way that the orthonormality rules are not
+    # satisfied anymore.  In this case, the MPS should be reorthogonalised in order to
+    # restore the Vidal form.
     return ψ
 end
 

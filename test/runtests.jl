@@ -214,41 +214,50 @@ end
             dot(x_vidal, x_vidal) - dot(x_vidal, y_vidal)
     end
 
-    @testset "Application of one-site operators" begin
-        a = random_itensor(s[1], s[1]')
+    @testset "Application of one-site unitary operators" begin
+        a = op("RandomUnitary", s, 1)
+        @test MPSTimeEvolution.check_vidal_form(apply(a, x_vidal))
         @test convert(MPS, apply(a, x_vidal)) ≈ apply(a, x)
 
-        b = random_itensor(s[3], s[3]')
+        b = op("RandomUnitary", s, 3)
+        @test MPSTimeEvolution.check_vidal_form(apply(b, x_vidal))
         @test convert(MPS, apply(b, x_vidal)) ≈ apply(b, x)
 
-        c = random_itensor(s[N], s[N]')
+        c = op("RandomUnitary", s, N)
+        @test MPSTimeEvolution.check_vidal_form(apply(c, x_vidal))
         @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
     end
 
-    @testset "Application of two-site operators" begin
-        a = random_itensor(s[1], s[2], s[1]', s[2]')
+    @testset "Application of two-site unitary operators" begin
+        a = op("RandomUnitary", s, 1, 2)
+        @test MPSTimeEvolution.check_vidal_form(apply(a, x_vidal))
         @test convert(MPS, apply(a, x_vidal)) ≈ apply(a, x)
 
-        b = random_itensor(s[2], s[3], s[2]', s[3]')
+        b = op("RandomUnitary", s, 2, 3)
+        @test MPSTimeEvolution.check_vidal_form(apply(b, x_vidal))
         @test convert(MPS, apply(b, x_vidal)) ≈ apply(b, x)
 
-        c = random_itensor(s[N - 1], s[N], s[N - 1]', s[N]')
+        c = op("RandomUnitary", s, N-1, N)
+        @test MPSTimeEvolution.check_vidal_form(apply(c, x_vidal))
         @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
 
-        d = random_itensor(s[2], s[4], s[2]', s[4]')
+        d = op("RandomUnitary", s, 2, 4)
         # The tensor indices are not contiguous site indices. The apply function should
         # throw an error in this case.
         @test_throws ErrorException apply(d, x_vidal)
     end
 
-    @testset "Application of three-site operators" begin
-        a = random_itensor(s[1], s[2], s[3], s[1]', s[2]', s[3]')
+    @testset "Application of three-site unitary operators" begin
+        a = op("RandomUnitary", s, 1, 2, 3)
+        @test MPSTimeEvolution.check_vidal_form(apply(a, x_vidal))
         @test convert(MPS, apply(a, x_vidal)) ≈ apply(a, x)
 
-        b = random_itensor(s[2], s[3], s[4], s[2]', s[3]', s[4]')
+        b = op("RandomUnitary", s, 2, 3, 4)
+        @test MPSTimeEvolution.check_vidal_form(apply(b, x_vidal))
         @test convert(MPS, apply(b, x_vidal)) ≈ apply(b, x)
 
-        c = random_itensor(s[N - 2], s[N - 1], s[N], s[N - 2]', s[N - 1]', s[N]')
+        c = op("RandomUnitary", s, N-2, N-1, N)
+        @test MPSTimeEvolution.check_vidal_form(apply(c, x_vidal))
         @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
     end
 
