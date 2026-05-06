@@ -15,18 +15,11 @@ function _replace_and_decompose!(ψ::VidalMPS, M::ITensor; kwargs...)
     N = length(ns)
 
     # 2. Gather the indices relative to the leftmost site of A.
-    #    If A is not on the left edge of the MPS, we also include the link index which is
-    #    dangling on the left.
-
-    # 3. Recursively decompose A with an SVD, until we exhaust the site indices.
     site_ts = site_tensors(ψ)
     bond_ts = bond_tensors(ψ)
+    linds = commoninds(M, bond_ts[ns[1] - 1] * site_ts[ns[1]])
 
-    linds = if ns[1] > 1
-        commoninds(M, bond_ts[ns[1] - 1] * site_ts[ns[1]])
-    else
-        commoninds(M, site_ts[ns[1]])
-    end
+    # 3. Recursively decompose A with an SVD, until we exhaust the site indices.
     U, S, V = svd(
         M, linds...; lefttags="Link,r=$(ns[1])", righttags="Link,l=$(ns[2])", kwargs...
     )
@@ -83,25 +76,18 @@ function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
     diff_ns = diff(ns)
     ns′ = ns
     if any(!=(1), diff_ns)
-        error("apply not (yet) implemented for non-consecutive application sites")
+        error("apply not implemented for non-consecutive application sites")
         # ns′ = [ns[1] + n - 1 for n in 1:N]
         # ψ = movesites(ψ, ns .=> ns′; kwargs...)
     end
 
     # Multiply everything in the VidalMPS from ns′[1] to ns′[end] together, and include the
     # bond tensors to the left of ns′[1] and to the right ns′[end].
-    ϕ = site_tensors(ψ)[ns′[1]]
-    if ns′[1] > 1
-        Λₗ = bond_tensors(ψ)[ns′[1] - 1]
-        ϕ *= Λₗ
-    end
+    ϕ = bond_tensors(ψ)[ns′[1] - 1] * site_tensors(ψ)[ns′[1]]
     for n in 2:N
-        ϕ *= site_tensors(ψ)[ns′[n]] * bond_tensors(ψ)[ns′[n] - 1]
+        ϕ *= bond_tensors(ψ)[ns′[n] - 1] * site_tensors(ψ)[ns′[n]]
     end
-    if ns′[N] < length(site_tensors(ψ))
-        Λᵣ = bond_tensors(ψ)[ns′[N]]
-        ϕ *= Λᵣ
-    end
+    ϕ *= bond_tensors(ψ)[ns′[N]]
 
     # Apply the operator to the combined site and bond tensors.
     ϕ = ITensors.product(o, ϕ)
@@ -112,17 +98,16 @@ function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
     else
         site_tensors(ψ)[only(ns)] = ϕ
     end
+    # FIXME If we act on the MPS with a non-unitary single-site operator, the site tensor on
+    # which it acts will not satisfy the orthonormality rules anymore. We need a way to
+    # shift the non-unit factor to the adjacent bond tensors.
 
     # Restore the Vidal form by re-inserting the bond tensors on the left and on the right.
     # Note that the bond tensors at ns′[1] and ns′[N] from the input VidalMPS were not
     # modified, so we don't need to "reinsert" them. We just need to multiply the first and
     # last of the new site tensors.
-    if ns′[1] > 1
-        site_tensors(ψ)[ns′[1]] *= inv.(Λₗ)
-    end
-    if ns′[N] < length(site_tensors(ψ))
-        site_tensors(ψ)[ns′[N]] *= inv.(Λᵣ)
-    end
+    site_tensors(ψ)[ns′[1]] *= inv.(bond_tensors(ψ)[ns′[1] - 1])
+    site_tensors(ψ)[ns′[N]] *= inv.(bond_tensors(ψ)[ns′[N]])
 
     return ψ
 end
@@ -194,13 +179,7 @@ function simplified_self_contraction(ψ::VidalMPS, A::ITensor, j)
     #                           ╰──◇──○──◇──╯
     #                                 j
 
-    Mⱼ = if j == nsites(ψ)
-        bond_tensors(ψ)[j - 1] * site_tensors(ψ)[j]
-    elseif j == 1
-        site_tensors(ψ)[j] * bond_tensors(ψ)[j]
-    else
-        bond_tensors(ψ)[j - 1] * site_tensors(ψ)[j] * bond_tensors(ψ)[j]
-    end
+    Mⱼ = bond_tensors(ψ)[j - 1] * site_tensors(ψ)[j] * bond_tensors(ψ)[j]
     contr_pre = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[1:(j - 2)]; init=1.0)
     contr_post = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[(j + 1):end]; init=1.0)
     return contr_pre * contr_post * inner(Mⱼ, apply(A, Mⱼ))

@@ -76,7 +76,8 @@ function LinearAlgebra.norm(ψ::VidalMPS; neg_atol=eps(real(NDTensors.scalartype
             norm2_ψ = zero(norm2_ψ)
         else
             error(
-                "norm² is $norm2_ψ, which is negative beyond an absolute tolerance of $neg_atol.",
+                "norm² is $norm2_ψ, which is negative beyond an absolute tolerance " *
+                "of $neg_atol.",
             )
         end
     end
@@ -115,24 +116,16 @@ function ITensorMPS.truncate!(
     ψ::VidalMPS; site_range=1:nsites(ψ), callback=Returns(nothing), kwargs...
 )
     site_ts = site_tensors(ψ)
-    bond_ts = OffsetArray([ITensor(1.0); bond_tensors(ψ); ITensor(1.0)], 0:nsites(ψ))
-    # Let's try this new thing here first: we add a trivial bond tensor to the left of
-    # Γ₁ and to the right of Γₙ, so that there are n+1 bond tensors in total.
+    bond_ts = bond_tensors(ψ)
     # When we truncate the (j, j+1) bond we need to incorporate Λⱼ₋₁ and Λⱼ₊₁ in the
-    # tensor we want to decompose and truncate, so these trivial bond tensors might help us
-    # write a simpler code, without having to discriminate the j=1 and j=N-1 case each time
+    # tensor we want to decompose and truncate, so the trivial bond tensors help us
+    # write a simpler routine, without having to discriminate the j=1 and j=N-1 case each time
     # (where normally there wouldn't be both bond tensors on the left and on the right).
-    # We use ITensor(1.0) instead of OneITensor() because we need to call `inv.` on it, and
-    # there's no such method for OneITensors.
-    # TODO: try this logic everywhere for the VidalMPS type?
 
     # We perform truncations from right to left. This is how ITensor does it, and how we
     # should implement it if we want the results to match, i.e. if we want that
     #   truncate(v::MPS; ...) ≈ truncate(convert(VidalMPS, v); ...)
     # for the same `site_range`, `cutoff` and `maxdim` on both sides.
-    #
-    # TODO: find out why left-to-right and right-to-left truncation sequences do not yield
-    # equivalent MPSs, either in the standard or in the Vidal form.
     for j in reverse((first(site_range) + 1):last(site_range))
         M = bond_ts[j - 2] * site_ts[j - 1] * bond_ts[j - 1] * site_ts[j] * bond_ts[j]
         # inds(M) = (rⱼ₋₁, sⱼ, sⱼ₊₁, lⱼ₊₁)
@@ -317,7 +310,9 @@ function Base.:(+)(::Algorithm"directsum", ψs::VidalMPS...)
     Γₙ = replaceind(Γₙ, lₙ => dag(prev_link_inds))
     sum_site_ts[n] = Γₙ
 
-    return VidalMPS(sum_site_ts, sum_bond_ts)
+    return VidalMPS(
+        sum_site_ts, OffsetVector([ITensor(1.0); sum_bond_ts; ITensor(1.0)], 0:N)
+    )
 end
 
 function Base.:(+)(::Algorithm"densitymatrix", ψs::VidalMPS...; cutoff=1e-15, kwargs...)
@@ -339,10 +334,11 @@ function scalarmult!(ψ::VidalMPS, a::Number)
     # tensor by exp(i*arg(a)), which means that we multiply the vectors associated to the
     # singular values (of the last bond tensor) by a unit complex number. This should be
     # okay.
+    N = nsites(ψ)
     st = site_tensors(ψ)
     bt = bond_tensors(ψ)
-    st[end] *= cis(angle(a))
-    bt[end] *= abs(a)
+    st[N] *= cis(angle(a))
+    bt[N - 1] *= abs(a)
     return ψ
 end
 

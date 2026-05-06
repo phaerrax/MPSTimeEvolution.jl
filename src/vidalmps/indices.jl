@@ -35,15 +35,7 @@ function ITensors.SiteTypes.siteind(ψ::VidalMPS, j::Integer; kwargs...)
     return if N == 1
         firstind(only(site_tensors(ψ)); kwargs...)
     else
-        if j == 1
-            uniqueind(site_tensors(ψ)[j], bond_tensors(ψ)[j]; kwargs...)
-        elseif j == N
-            uniqueind(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1]; kwargs...)
-        else
-            uniqueind(
-                site_tensors(ψ)[j], bond_tensors(ψ)[j - 1], bond_tensors(ψ)[j]; kwargs...
-            )
-        end
+        uniqueind(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1], bond_tensors(ψ)[j]; kwargs...)
     end
 end
 
@@ -60,15 +52,9 @@ function ITensors.SiteTypes.siteinds(ψ::VidalMPS, j::Integer; kwargs...)
     return if N == 1
         inds(only(site_tensors(ψ)); kwargs...)
     else
-        if j == 1
-            uniqueinds(site_tensors(ψ)[j], bond_tensors(ψ)[j]; kwargs...)
-        elseif j == N
-            uniqueinds(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1]; kwargs...)
-        else
-            uniqueinds(
-                site_tensors(ψ)[j], bond_tensors(ψ)[j - 1], bond_tensors(ψ)[j]; kwargs...
-            )
-        end
+        uniqueinds(
+            site_tensors(ψ)[j], bond_tensors(ψ)[j - 1], bond_tensors(ψ)[j]; kwargs...
+        )
     end
 end
 
@@ -89,11 +75,7 @@ function leftlinkind(ψ::VidalMPS, j::Integer; kwargs...)
     return if N == 1
         nothing
     else
-        if j == 1
-            nothing
-        else
-            commonind(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1]; kwargs...)
-        end
+        commonind(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1]; kwargs...)
     end
 end
 
@@ -103,11 +85,7 @@ function leftlinkinds(ψ::VidalMPS, j::Integer; kwargs...)
     return if N == 1
         nothing
     else
-        if j == 1
-            nothing
-        else
-            commoninds(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1]; kwargs...)
-        end
+        commoninds(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1]; kwargs...)
     end
 end
 
@@ -124,11 +102,7 @@ function rightlinkind(ψ::VidalMPS, j::Integer; kwargs...)
     return if N == 1
         nothing
     else
-        if j == N
-            nothing
-        else
-            commonind(site_tensors(ψ)[j], bond_tensors(ψ)[j]; kwargs...)
-        end
+        commonind(site_tensors(ψ)[j], bond_tensors(ψ)[j]; kwargs...)
     end
 end
 
@@ -138,11 +112,7 @@ function rightlinkinds(ψ::VidalMPS, j::Integer; kwargs...)
     return if N == 1
         nothing
     else
-        if j == N
-            nothing
-        else
-            commoninds(site_tensors(ψ)[j], bond_tensors(ψ)[j]; kwargs...)
-        end
+        commoninds(site_tensors(ψ)[j], bond_tensors(ψ)[j]; kwargs...)
     end
 end
 
@@ -159,16 +129,10 @@ function ITensorMPS.linkinds(ψ::VidalMPS, j::Integer; kwargs...)
     return if N == 1
         nothing
     else
-        if j == 1
+        [
+            commoninds(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1]; kwargs...);
             commoninds(site_tensors(ψ)[j], bond_tensors(ψ)[j]; kwargs...)
-        elseif j == N
-            commoninds(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1]; kwargs...)
-        else
-            [
-                commoninds(site_tensors(ψ)[j], bond_tensors(ψ)[j - 1]; kwargs...);
-                commoninds(site_tensors(ψ)[j], bond_tensors(ψ)[j]; kwargs...)
-            ]
-        end
+        ]
     end
 end
 
@@ -222,13 +186,14 @@ function ITensors.replaceinds(
 end
 
 function Base.map!(f::Function, ψ::VidalMPS)
+    N = nsites(ψ)
     site_ts = site_tensors(ψ)
-    for i in eachindex(site_ts)
+    for i in 1:N
         site_ts[i] = f(site_ts[i])
     end
 
     bond_ts = bond_tensors(ψ)
-    for i in eachindex(bond_ts)
+    for i in 1:(N - 1)
         bond_ts[i] = f(bond_ts[i])
     end
 

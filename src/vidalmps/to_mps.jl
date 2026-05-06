@@ -63,11 +63,9 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; cutoff=1e-8)
             cutoff=cutoff,
         )
 
-        #    ┌────┐         ┌──────┐      ┌────┐
-        # ───│A⁽ⁿ⁾│─── = ───│Λ⁽ⁿ⁻¹⁾│──────│Γ⁽ⁿ⁾│────
-        #    └────┘         └──────┘      └────┘
-        #      │                            │
-        #      │                            │
+        # ───A[n]─── = ───Λ[n-1]──────Γ[n]────
+        #     │                        │
+        #     │                        │
 
         site_ts[n] = inv.(bond_ts[n - 1]) * A
     end
@@ -76,5 +74,6 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; cutoff=1e-8)
     # site_ts[N] = inv.(bond_ts[N-1]) * M = inv.(bond_ts[N-1]) * bond_ts[N-1] * V * ψ[N]
     site_ts[N] = V * ψ[N]
 
-    return VidalMPS(site_ts, bond_ts)
+    # Add the trivial bond tensors at the edges of the MPS, and return.
+    return VidalMPS(site_ts, OffsetVector([ITensor(1.0); bond_ts; ITensor(1.0)], 0:N))
 end

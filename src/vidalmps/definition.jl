@@ -1,29 +1,46 @@
 export VidalMPS
 
 mutable struct VidalMPS
+    #        │       │       │         │       │       │
+    #    ◇···○───◇───○───◇───○─╶╶  ╶╶╶─○───◇───○───◇───○···◇
+    #       Γ[1]    Γ[2]    Γ[3]      Γ[N-2]  Γ[N-1]  Γ[N]
+    #   Λ[0]    Λ[1]    Λ[2]             Λ[N-2]  Λ[N-1]   Λ[N]
+    #
     site_tensors::Vector{ITensor}
-    bond_tensors::Vector{ITensor}
+    bond_tensors::OffsetVector{ITensor}
+    # The `bond_tensors` member is an OffsetVector because we want to add trivial bond
+    # tensors at the edges of the MPS (this simplifies the logic in some functions a lot),
+    # while at the same time preserving the "natural" indexing of the actual bond tensors
+    # from 1 to N-1.
+    # For the trivial bond tensors we will use ITensor(1.0), and not e.g. OneITensor(),
+    # because we need to call `inv.` on it, and there's no such method for OneITensors.
+    # There are no actual indices linking these trivial bond tensors to the adjacent site
+    # tensors.
 end
 
 site_tensors(v::VidalMPS) = v.site_tensors
 bond_tensors(v::VidalMPS) = v.bond_tensors
 
 Base.length(ψ::VidalMPS) = length(site_tensors(ψ)) + length(bond_tensors(ψ))
+# `length` here should be considered as an internal function that shouldn't really be called
+# by end users; it has beed added because it is required by some iterators. Consider using
+# `nsites` instead.
+
 nsites(ψ::VidalMPS) = length(site_tensors(ψ))
 
-# site tensors --> (0, n), n from 1 to N
-# bond tensors --> (1, n), n from 1 to N-1
-# iteration sequence: (0, 1) -> (1, 1) -> (0, 2) -> ... -> (1, ns-1) -> (0, ns)
-Base.iterate(ψ::VidalMPS) = (site_tensors(ψ)[1], (0, 1))
+# bond tensors --> (0, n), n from 0 to N
+# site tensors --> (1, n), n from 1 to N
+# iteration sequence: (0, 0) -> (1, 0) -> (1, 1) -> ... -> (0, N-1) -> (1, N) -> (0, N)
+Base.iterate(ψ::VidalMPS) = (first(bond_tensors(ψ)), (0, 0))
 function Base.iterate(ψ::VidalMPS, state)
     t_type, n = state
-    return if n ≥ nsites(ψ)
+    return if state == (0, nsites(ψ)) || n > nsites(ψ)
         nothing
     else
-        if t_type == 0
-            bond_tensors(ψ)[n], (rem(t_type + 1, 2), n)
-        else
+        if t_type == 0  # then `state` is a bond tensor. Return the next site tensor.
             site_tensors(ψ)[n + 1], (rem(t_type + 1, 2), n+1)
+        else  # then `state` is a site tensor. Return the next bond tensor.
+            bond_tensors(ψ)[n], (rem(t_type + 1, 2), n)
         end
     end
 end
@@ -33,14 +50,16 @@ Base.keys(ψ::VidalMPS) = 1:length(ψ)
 ### Constructors
 # (carried over from the MPS type from ITensorMPS)
 
-VidalMPS() = VidalMPS(ITensor[], ITensor[])  # Empty VidalMPS with no sites.
+VidalMPS() = VidalMPS(ITensor[], OffsetVector(ITensor[]))  # Empty VidalMPS with no sites.
 
 function VidalMPS(N::Int)
     # Construct a VidalMPS with N sites, with default-constructed ITensors.
     #
     # Beware that N is the number of the site tensors.
     # (This is a default constructor that is not meant to be called directly.)
-    return VidalMPS(Vector{ITensor}(undef, N), Vector{ITensor}(undef, N-1))
+    return VidalMPS(
+        Vector{ITensor}(undef, N), OffsetVector(Vector{ITensor}(undef, N+1), 0:N)
+    )
 end
 
 """
@@ -52,7 +71,7 @@ indices.
 function VidalMPS(::Type{T}, sites::Vector{<:Index}) where {T<:Number}
     N = length(sites)
     site_tensors = Vector{ITensor}(undef, N)
-    bond_tensors = Vector{ITensor}(undef, N-1)
+    bond_tensors = OffsetVector(Vector{ITensor}(undef, N+1), 0:N)
 
     link_indices_left = [Index(1, "Link,l=$i") for i in 1:(N - 1)]
     link_indices_right = [Index(1, "Link,r=$i") for i in 1:(N - 1)]
@@ -68,10 +87,13 @@ function VidalMPS(::Type{T}, sites::Vector{<:Index}) where {T<:Number}
             )
         end
     end
+
+    bond_tensors[0] = ITensor(1.0)
     for i in 1:(N - 1)
         bond_tensors[i] = diag_itensor(T, dag(link_indices_right[i]), link_indices_left[i])
         bond_tensors[i][dag(link_indices_right[i]) => 1, link_indices_left[i] => 1] = 1.0
     end
+    bond_tensors[N] = ITensor(1.0)
 
     return VidalMPS(site_tensors, bond_tensors)
 end
@@ -108,35 +130,38 @@ function VidalMPS(eltype::Type{<:Number}, sites::Vector{<:Index}, states_)
     if N != length(sites)
         error("sites and states do not have the same number of elements")
     end
-    ψ = VidalMPS(N)
+
+    site_ts = Vector{ITensor}(undef, N)
+    bond_ts = Vector{ITensor}(undef, N-1)
+    # We'll add the trivial edge bonds and convert it to an OffsetVector later.
 
     link_indices_left = [Index(1; tags="Link,l=$n") for n in 1:(N - 1)]
     link_indices_right = [Index(1; tags="Link,r=$n") for n in 1:(N - 1)]
 
     if N == 1
-        site_tensors(ψ)[1] = state(only(sites), only(states_))
+        site_ts[1] = state(only(sites), only(states_))
     else
-        site_tensors(ψ)[1] = state(sites[1], states_[1]) * state(link_indices_right[1], 1)
+        site_ts[1] = state(sites[1], states_[1]) * state(link_indices_right[1], 1)
         for n in 2:(N - 1)
-            site_tensors(ψ)[n] =
+            site_ts[n] =
                 state(dag(link_indices_left[n - 1]), 1) *
                 state(sites[n], states_[n]) *
                 state(link_indices_right[n], 1)
         end
-        site_tensors(ψ)[N] =
-            state(dag(link_indices_left[N - 1]), 1) * state(sites[N], states_[N])
+        site_ts[N] = state(dag(link_indices_left[N - 1]), 1) * state(sites[N], states_[N])
         for n in 1:(N - 1)
-            bond_tensors(ψ)[n] = diag_itensor(
-                dag(link_indices_right[n]), link_indices_left[n]
-            )
-            bond_tensors(ψ)[n][dag(link_indices_right[n]) => 1, link_indices_left[n] => 1] =
-                1.0
+            bond_ts[n] = diag_itensor(dag(link_indices_right[n]), link_indices_left[n])
+            bond_ts[n][dag(link_indices_right[n]) => 1, link_indices_left[n] => 1] = 1.0
         end
     end
 
+    # convert_leaf_eltype is not defined on OffsetArrays so we apply first to a standard
+    # vector of ITensors.
     return VidalMPS(
-        convert_leaf_eltype(eltype, site_tensors(ψ)),
-        convert_leaf_eltype(eltype, bond_tensors(ψ)),
+        convert_leaf_eltype(eltype, site_ts),
+        OffsetVector(
+            convert_leaf_eltype(eltype, [ITensor(1.0); bond_ts; ITensor(1.0)]), 0:N
+        ),
     )
 end
 
@@ -200,7 +225,9 @@ copying the ITensor data.
 ITensorMPS.deepcopy(ψ::VidalMPS) = VidalMPS(copy.(site_tensors(ψ)), copy.(bond_tensors(ψ)))
 
 function LinearAlgebra.promote_leaf_eltypes(ψ::VidalMPS)
-    return LinearAlgebra.promote_leaf_eltypes([site_tensors(ψ); bond_tensors(ψ)])
+    # `LinearAlgebra.promote_leaf_eltypes` requires one-based indexing, so we use `parent`
+    # to retrieve the standard array underlying the OffsetArray.
+    return LinearAlgebra.promote_leaf_eltypes([site_tensors(ψ); parent(bond_tensors(ψ))])
 end
 NDTensors.scalartype(ψ::VidalMPS) = LinearAlgebra.promote_leaf_eltypes(ψ)
 
@@ -212,9 +239,12 @@ function Base.show(io::IO, ψ::VidalMPS)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", ψ::VidalMPS)
-    println(io, "$(nsites(ψ))-site VidalMPS:")
+    N = nsites(ψ)
+    println(io, "$(N)-site VidalMPS:")
     st = site_tensors(ψ)
-    bt = bond_tensors(ψ)
+    bt = bond_tensors(ψ)[1:(N - 1)]
+    # We don't show the trivial bond tensors at the edges of the MPS.
+
     siteinds_vec = map(eachindex(st)) do j
         !isassigned(st, j) && return ITensorMPS.Undef()
         return inds(st[j])
