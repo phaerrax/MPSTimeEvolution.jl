@@ -88,7 +88,7 @@ end
 ### Truncation
 
 """
-    truncate!(M::VidalMPS; kwargs...)
+    truncate!(ψ::VidalMPS; kwargs...)
 
 Perform a truncation of all bonds of a VidalMPS using the truncation parameters
 (`cutoff`, `maxdim`, etc.) provided as keyword arguments.
@@ -102,7 +102,7 @@ Keyword arguments:
   is `Float64`. Consider the following example that illustrates one possible use case.
 
 ```julia
-nbonds = 9
+nbonds = nsites(ψ) - 1
 truncation_errors = zeros(nbonds)
 function callback(; link, truncation_error)
     bond_no = last(link)
@@ -117,10 +117,10 @@ function ITensorMPS.truncate!(
 )
     site_ts = site_tensors(ψ)
     bond_ts = bond_tensors(ψ)
-    # When we truncate the (j, j+1) bond we need to incorporate Λⱼ₋₁ and Λⱼ₊₁ in the
-    # tensor we want to decompose and truncate, so the trivial bond tensors help us
-    # write a simpler routine, without having to discriminate the j=1 and j=N-1 case each time
-    # (where normally there wouldn't be both bond tensors on the left and on the right).
+    # When we truncate the (j, j+1) bond we need to incorporate Λⱼ₋₁ and Λⱼ₊₁ in the tensor
+    # we want to decompose and truncate: the trivial bond tensors help us write a simpler
+    # routine, without having to discriminate the j=1 and j=N-1 case each time (where
+    # normally there wouldn't be a bond tensor both on the left and on the right).
 
     # We perform truncations from right to left. This is how ITensor does it, and how we
     # should implement it if we want the results to match, i.e. if we want that
@@ -128,23 +128,42 @@ function ITensorMPS.truncate!(
     # for the same `site_range`, `cutoff` and `maxdim` on both sides.
     for j in reverse((first(site_range) + 1):last(site_range))
         M = bond_ts[j - 2] * site_ts[j - 1] * bond_ts[j - 1] * site_ts[j] * bond_ts[j]
-        # inds(M) = (rⱼ₋₁, sⱼ, sⱼ₊₁, lⱼ₊₁)
-        # (except if j == 1 or j == N-1, then there's one bond index less).
-        #
-        # Even if j-1 == 0 or j+1 == N we don't need to worry, because the trivial
-        # tensors will be picked up instead of getting an error because the index is out of
-        # bounds.
+        #      │           │           │           │
+        #  ╶╶╶─○─────◇─────○─────◇─────○─────◇─────○─╶╶
+        #        Λ[j-2] Γ[j-1] Λ[j-1] Γ[j]  Λ[j]
 
-        rinds = uniqueinds(M, bond_ts[j - 2]*site_ts[j - 1])
-        rtags = tags(commonind(site_ts[j], bond_ts[j - 1]))
-        ltags = tags(commonind(site_ts[j - 1], bond_ts[j - 1]))
-        # rinds = (sⱼ, rⱼ)
-        # rtags = "Link,l=j"
-        # ltags = "Link,r=j-1"
+        # We should have
+        #   inds(M) = (rⱼ₋₂, sⱼ₋₁, sⱼ, lⱼ₊₁)
+        # except if j == 1 or j == N-1, then there's one bond index less, but we don't need
+        # to worry, because the trivial tensors will be picked up instead of getting an
+        # error because the index is out of bounds.
+        # We'll decompose M as U*S*V, then put U in the j-th site tensor, V in the
+        # (j-1)-th one, then continue with the truncation on the (j-1)-th bond.
+
+        linds = uniqueinds(M, bond_ts[j - 2] * site_ts[j - 1])
+        #                           ┌╶╶╶╶╶╶╶╶╶╶╶╶┐
+        #                 sⱼ₋₁      ╎  sⱼ        ╎
+        #      │  rⱼ₋₂     │     M  ╎  │     lⱼ₊₁╎ │
+        #  ╶╶╶─○──────▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒▓▓▓▓▓▓▓▓────╎─○─╶╶
+        #                           └╶╶╶╶╶╶╶╶╶╶╶╶┘
+        #                                linds
+        #
+        # inds(bond_ts[j - 2] * site_ts[j - 1]) = (rⱼ₋₂, sⱼ₋₁)
+        #  ↪ uniqueinds(M, bond_ts[j - 2] * site_ts[j - 1]) =
+        #       = (rⱼ₋₂, sⱼ₋₁, sⱼ, lⱼ₊₁) \ (rⱼ₋₂, sⱼ₋₁) = (sⱼ, lⱼ₊₁)
+
+        ltags = tags(commonind(bond_ts[j - 1], site_ts[j]))  # = "Link,l=j"
+        rtags = tags(commonind(site_ts[j - 1], bond_ts[j - 1]))  # = "Link,r=j-1"
 
         U, bond_ts[j - 1], V, spec = svd(
-            M, rinds; lefttags=ltags, righttags=rtags, kwargs...
+            M, linds; lefttags=ltags, righttags=rtags, kwargs...
         )
+        #               sⱼ₋₁                 sⱼ
+        #      │   rⱼ₋₂   │ rⱼ₋₁         lⱼ  │   lⱼ₊₁  │
+        #  ╶╶╶─○──────────V───────Λⱼ₋₁───────U─────────○─╶╶
+        #
+        # The  `lefttags` are assigned to the Λⱼ₋₁──U bond, while the `righttags` to the
+        # V──Λⱼ₋₁ one.
 
         callback(; link=(j => j - 1), truncation_error=spec.truncerr)
 
@@ -153,11 +172,6 @@ function ITensorMPS.truncate!(
         site_ts[j] = inv.(bond_ts[j]) * U
         site_ts[j - 1] = V * inv.(bond_ts[j - 2])
     end
-
-    # We need to reassign the bond tensors to ψ because in creating the OffsetArray at the
-    # beginning we made a copy of the bond tensors, so ψ's bond tensors haven't actually
-    # been modified until now.
-    ψ.bond_tensors = bond_ts[1:(nsites(ψ) - 1)]
 
     return ψ
 end
