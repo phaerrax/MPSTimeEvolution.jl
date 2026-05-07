@@ -1,14 +1,26 @@
 ### MPS <-> VidalMPS conversion functions
 
 # VidalMPS to MPS: merge the bond indices into the site indices.
-# For now, we always output a left-canonical MPS.
-function Base.convert(::Type{MPS}, ψ::VidalMPS)
+function Base.convert(::Type{MPS}, ψ::VidalMPS; ortho_center=1)
     M = Vector{ITensor}(undef, nsites(ψ))
-    M[1] = site_tensors(ψ)[1]
-    for n in 2:length(M)
+
+    for n in 1:(ortho_center - 1)
+        # To the left of the orthocenter: M[n] = Λ[n-1] Γ[n]
         M[n] = bond_tensors(ψ)[n - 1] * site_tensors(ψ)[n]
     end
-    return MPS(M; ortho_lims=1:1)
+
+    # Orthocenter site: M[n] = Λ[n-1] Γ[n] Λ[n]
+    M[ortho_center] =
+        bond_tensors(ψ)[ortho_center - 1] *
+        site_tensors(ψ)[ortho_center] *
+        bond_tensors(ψ)[ortho_center]
+
+    for n in (ortho_center + 1):length(M)
+        # To the right of the orthocenter: M[n] = Γ[n] Λ[n]
+        M[n] = site_tensors(ψ)[n] * bond_tensors(ψ)[n]
+    end
+
+    return MPS(M; ortho_lims=ortho_center:ortho_center)
 end
 
 # MPS to VidalMPS: orthogonalise the MPS first, then use the SVD to separate the bond

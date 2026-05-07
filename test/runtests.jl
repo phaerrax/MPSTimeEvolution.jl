@@ -183,6 +183,13 @@ end
     x_vidal = convert(VidalMPS, x)
     y_vidal = convert(VidalMPS, y)
 
+    @testset "Conversion to MPS" begin
+        @test all(1:N) do n
+            v = convert(MPS, x_vidal; ortho_center=n)
+            norm(v) ≈ inner(v[n], v[n])
+        end
+    end
+
     @testset "Truncation" begin
         s′ = siteinds("Boson", N; dim=6)
         # We need bigger site indices so that we have more room for truncation.
