@@ -274,10 +274,10 @@ function check_vidal_form(ψ::VidalMPS)
     # bond tensors at the edges).
     for (j, Λ) in enumerate(bt[1:(N - 1)])
         if any(!isreal, diag(Λ))
-            push!(errors, "non-real singular values on bond $j.")
+            push!(errors, "non-real singular values on bond $j")
         end
         if any(<(0), diag(Λ))
-            push!(errors, "negative singular values on bond $j.")
+            push!(errors, "negative singular values on bond $j")
         end
     end
 
@@ -291,7 +291,7 @@ function check_vidal_form(ψ::VidalMPS)
 
     M₁ = st[1] * stdag[1]
     if !isapprox(ITensors.matrix(M₁), I)
-        push!(errors, "orthogonality condition not satisfied on site 1.")
+        push!(errors, "left-orthonormality condition not satisfied on site 1")
     end
 
     #   ───Γ[N]       ───╮
@@ -302,7 +302,7 @@ function check_vidal_form(ψ::VidalMPS)
 
     Mₙ = st[N] * stdag[N]
     if !isapprox(ITensors.matrix(Mₙ), I)
-        push!(errors, "orthogonality condition not satisfied on site $N.")
+        push!(errors, "right-orthonormality condition not satisfied on site $N")
     end
 
     #   ───Γ[j]───Λ[j]───╮                     ───╮
@@ -315,7 +315,7 @@ function check_vidal_form(ψ::VidalMPS)
         Mⱼ = st[j] * bt[j] * stdag[j] * btdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, bt[j] * btdag[j]))
         if !isapprox(ITensors.matrix(Mⱼ), scalar(bt[j] * bt[j]) * I)
-            push!(errors, "orthogonality condition not satisfied on site $j.")
+            push!(errors, "right-orthonormality condition not satisfied on site $j")
         end
     end
 
@@ -329,7 +329,7 @@ function check_vidal_form(ψ::VidalMPS)
         Mⱼ = bt[j - 1] * st[j] * btdag[j - 1] * stdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, bt[j - 1] * btdag[j - 1]))
         if !isapprox(ITensors.matrix(Mⱼ), scalar(bt[j - 1] * bt[j - 1]) * I)
-            push!(errors, "orthogonality condition not satisfied on site $j.")
+            push!(errors, "left-orthonormality condition not satisfied on site $j")
         end
     end
 
