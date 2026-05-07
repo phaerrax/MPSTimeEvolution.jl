@@ -2,7 +2,8 @@
 
 # VidalMPS to MPS: merge the bond indices into the site indices.
 function Base.convert(::Type{MPS}, ψ::VidalMPS; ortho_center=1)
-    M = Vector{ITensor}(undef, nsites(ψ))
+    N = nsites(ψ)
+    M = Vector{ITensor}(undef, N)
 
     for n in 1:(ortho_center - 1)
         # To the left of the orthocenter: M[n] = Λ[n-1] Γ[n]
@@ -15,11 +16,23 @@ function Base.convert(::Type{MPS}, ψ::VidalMPS; ortho_center=1)
         site_tensors(ψ)[ortho_center] *
         bond_tensors(ψ)[ortho_center]
 
-    for n in (ortho_center + 1):length(M)
+    for n in (ortho_center + 1):N
         # To the right of the orthocenter: M[n] = Γ[n] Λ[n]
         M[n] = site_tensors(ψ)[n] * bond_tensors(ψ)[n]
     end
 
+    # Restore the standard tags structure of an MPS created by ITensor. The tags resulting
+    # from the contractions above might be different from the standard, and this might
+    # create some problems for example with the `replaceinds!` function we use in
+    # `convert(VidalMPS, ...)` below.
+    old_link_inds = [commonind(M[n], M[n + 1]) for n in 1:(N - 1)]
+    new_link_inds = [Index(dim(old_link_inds[n]); tags="Link,l=$n") for n in 1:(N - 1)]
+    for n in 1:(N - 1)
+        M[n] *= delta(old_link_inds[n], new_link_inds[n])
+    end
+    for n in 2:N
+        M[n] *= delta(old_link_inds[n - 1], new_link_inds[n - 1])
+    end
     return MPS(M; ortho_lims=ortho_center:ortho_center)
 end
 
