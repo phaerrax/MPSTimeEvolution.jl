@@ -325,7 +325,7 @@ function Base.:(+)(::Algorithm"directsum", ψs::VidalMPS...)
     sum_site_ts[n] = Γₙ
 
     return VidalMPS(
-        sum_site_ts, OffsetVector([ITensor(1.0); sum_bond_ts; ITensor(1.0)], 0:N)
+        sum_site_ts, OffsetVector([ITensor(1.0); sum_bond_ts; ITensor(1.0)], 0:n)
     )
 end
 

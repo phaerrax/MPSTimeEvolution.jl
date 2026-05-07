@@ -204,6 +204,8 @@ end
     end
 
     @testset "Arithmetic operations" begin
+        @test +(x_vidal, y_vidal; alg="densitymatrix") ≈
+            +(x_vidal, y_vidal; alg="directsum")
         @test 2x_vidal ≈ x_vidal + x_vidal
         @test x_vidal + y_vidal - x_vidal ≈ y_vidal
         @test y_vidal / 4 ≈ 0.25 * y_vidal
