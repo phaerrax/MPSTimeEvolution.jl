@@ -109,6 +109,22 @@ function trotter1(os::OpSum{T}, sites, dt) where {T}
     return [oddseq, evenseq]
 end
 
+function trotter2(os::OpSum{T}, sites, dt) where {T}
+    opseq = tebdsequence(os, sites)
+    # U₂(t) = O(t/2) E(t) O(t/2)
+    oddseq = exp.(0.5dt .* operator.(filter(isodd, opseq)))
+    evenseq = exp.(dt .* operator.(filter(iseven, opseq)))
+    return [oddseq, evenseq, oddseq]
+end
+
+function extend_op(o::ITensor, sites)
+    # Return an ITensor given by extending `o` with the identity on all sites on which it
+    # wasn't already defined.
+    op_sites = inds(o; plev=0)
+    missing_sites = setdiff(sites, op_sites)
+    return o * op(I, missing_sites)
+end
+
 function extend_op(o::OpSeqTerm, sites)
     # Return an ITensor given by extending `o` with the identity on all sites on which it
     # wasn't already defined.

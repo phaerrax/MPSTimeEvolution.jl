@@ -281,7 +281,7 @@ end
     end
 end
 
-@testset "TEBD" begin
+@testset verbose=true "TEBD" begin
     N = 5
     ε = rand(N)
     λ = rand(ComplexF64, N-1)
@@ -296,48 +296,71 @@ end
         h += conj(λ[n]), "S-", n, "S+", n+1
     end
 
-    dt = 0.1
-    t1odd, t1even = MPSTimeEvolution.trotter1(h, s, -im*dt)
-    if isodd(N)
-        @test length(t1odd) == length(t1even) == div(N, 2)
-    else
-        @test length(t1odd) == length(t1even) + 1 == div(N, 2)
-    end
+    # First operator in the odd subsequence
+    h₁₂ =
+        ε[1] * op("Sz", s, 1) * op(I, s, 2) +
+        0.5ε[2] * op(I, s, 1) * op("Sz", s, 2) +
+        λ[1] * op("S+", s, 1) * op("S-", s, 2) +
+        conj(λ[1]) * op("S-", s, 1) * op("S+", s, 2)
+    # First operator in the even subsequence
+    h₂₃ =
+        0.5ε[2] * op("Sz", s, 2) * op(I, s, 3) +
+        0.5ε[3] * op(I, s, 2) * op("Sz", s, 3) +
+        λ[2] * op("S+", s, 2) * op("S-", s, 3) +
+        conj(λ[2]) * op("S-", s, 2) * op("S+", s, 3)
+    # Second operator in the odd subsequence
+    h₃₄ =  # (this holds if N > 4!)
+        0.5ε[3] * op("Sz", s, 3) * op(I, s, 4) +
+        0.5ε[4] * op(I, s, 3) * op("Sz", s, 4) +
+        λ[3] * op("S+", s, 3) * op("S-", s, 4) +
+        conj(λ[3]) * op("S-", s, 3) * op("S+", s, 4)
 
     @test prod(MPO(h, s)) ≈
         MPSTimeEvolution.full_tensor(MPSTimeEvolution.tebdsequence(h, s), s)
 
-    # Check that all operators returned by `trotter1` are unitary.
-    @test all([t1odd; t1even]) do u
-        u_inds = findall(in(inds(u)), s)
-        apply(MPSTimeEvolution.adj(u), u) ≈ op("Id", s[u_inds])
+    dt = 0.1
+
+    @testset "1st order Trotter-Suzuki" begin
+        t1odd, t1even = MPSTimeEvolution.trotter1(h, s, -im*dt)
+        if isodd(N)
+            @test length(t1odd) == length(t1even) == div(N, 2)
+        else
+            @test length(t1odd) == length(t1even) + 1 == div(N, 2)
+        end
+
+        # Check that all operators returned by `trotter1` are unitary.
+        @test all([t1odd; t1even]) do u
+            u_inds = findall(in(inds(u)), s)
+            apply(MPSTimeEvolution.adj(u), u) ≈ op("Id", s[u_inds])
+        end
+
+        @test t1odd[div(1, 2) + 1] ≈ exp(-im * dt * h₁₂)
+        @test t1odd[div(3, 2) + 1] ≈ exp(-im * dt * h₃₄)
+        @test t1even[div(2, 2)] ≈ exp(-im * dt * h₂₃)
     end
 
-    # First operator in the odd subsequence
-    n = 1
-    h₁₂ =
-        ε[n] * op("Sz", s, n) * op(I, s, n+1) +
-        0.5ε[n + 1] * op(I, s, n) * op("Sz", s, n+1) +
-        λ[n] * op("S+", s, n) * op("S-", s, n+1) +
-        conj(λ[n]) * op("S-", s, n) * op("S+", s, n+1)
-    @test t1odd[div(n, 2) + 1] ≈ exp(-im * dt * h₁₂)
+    @testset "2nd order Trotter-Suzuki" begin
+        t1odd, t1even = MPSTimeEvolution.trotter1(h, s, -im*dt)
+        t2odd, t2even, t2odd_again = MPSTimeEvolution.trotter2(h, s, -im*dt)
 
-    # Second operator in the odd subsequence
-    # (this holds if N > 4!)
-    n = 3
-    h₃₄ =
-        0.5ε[n] * op("Sz", s, n) * op(I, s, n+1) +
-        0.5ε[n + 1] * op(I, s, n) * op("Sz", s, n+1) +
-        λ[n] * op("S+", s, n) * op("S-", s, n+1) +
-        conj(λ[n]) * op("S-", s, n) * op("S+", s, n+1)
-    @test t1odd[div(n, 2) + 1] ≈ exp(-im * dt * h₃₄)
+        @test all(t2odd .≈ t2odd_again)
+        @test all([apply(u, u) for u in t2odd] .≈ t1odd)
+        @test all(t2even .≈ t1even)
 
-    # First operator in the even subsequence
-    n = 2
-    h₂₃ =
-        0.5ε[n] * op("Sz", s, n) * op(I, s, n+1) +
-        0.5ε[n + 1] * op(I, s, n) * op("Sz", s, n+1) +
-        λ[n] * op("S+", s, n) * op("S-", s, n+1) +
-        conj(λ[n]) * op("S-", s, n) * op("S+", s, n+1)
-    @test t1even[div(n, 2)] ≈ exp(-im * dt * h₂₃)
+        if isodd(N)
+            @test length(t2odd) == length(t2even) == div(N, 2)
+        else
+            @test length(t2odd) == length(t2even) + 1 == div(N, 2)
+        end
+
+        # Check that all operators returned by `trotter2` are unitary.
+        @test all([t2odd; t2even]) do u
+            u_inds = findall(in(inds(u)), s)
+            apply(MPSTimeEvolution.adj(u), u) ≈ op("Id", s[u_inds])
+        end
+
+        @test t2odd[div(1, 2) + 1] ≈ exp(-im * dt/2 * h₁₂)
+        @test t2odd[div(3, 2) + 1] ≈ exp(-im * dt/2 * h₃₄)
+        @test t2even[div(2, 2)] ≈ exp(-im * dt * h₂₃)
+    end
 end
