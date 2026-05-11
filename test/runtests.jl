@@ -1,5 +1,5 @@
 using Test, Documenter, MPSTimeEvolution
-using ITensors, ITensorMPS, LindbladVectorizedTensors, Observers, CSV
+using LinearAlgebra, ITensors, ITensorMPS, Observers, CSV, LindbladVectorizedTensors
 
 using MPSTimeEvolution: _sf_translate_sites, _sf_translate_sites_inv
 
@@ -279,4 +279,65 @@ end
         @test expect(y, "ProjDn"; sites=3:N) ≈ expect(y_vidal, "ProjDn"; sites=3:N)
         @test expect(x, ["Sx", "Sy", "Sz"]) ≈ expect(x_vidal, ["Sx", "Sy", "Sz"])
     end
+end
+
+@testset "TEBD" begin
+    N = 5
+    ε = rand(N)
+    λ = rand(ComplexF64, N-1)
+    s = siteinds("S=1/2", N)
+
+    h = OpSum()
+    for n in 1:N
+        h += ε[n], "Sz", n
+    end
+    for n in 1:(N - 1)
+        h += λ[n], "S+", n, "S-", n+1
+        h += conj(λ[n]), "S-", n, "S+", n+1
+    end
+
+    dt = 0.1
+    t1odd, t1even = MPSTimeEvolution.trotter1(h, s, -im*dt)
+    if isodd(N)
+        @test length(t1odd) == length(t1even) == div(N, 2)
+    else
+        @test length(t1odd) == length(t1even) + 1 == div(N, 2)
+    end
+
+    @test prod(MPO(h, s)) ≈
+        MPSTimeEvolution.full_tensor(MPSTimeEvolution.tebdsequence(h, s), s)
+
+    # Check that all operators returned by `trotter1` are unitary.
+    @test all([t1odd; t1even]) do u
+        u_inds = findall(in(inds(u)), s)
+        apply(MPSTimeEvolution.adj(u), u) ≈ op("Id", s[u_inds])
+    end
+
+    # First operator in the odd subsequence
+    n = 1
+    h₁₂ =
+        ε[n] * op("Sz", s, n) * op(I, s, n+1) +
+        0.5ε[n + 1] * op(I, s, n) * op("Sz", s, n+1) +
+        λ[n] * op("S+", s, n) * op("S-", s, n+1) +
+        conj(λ[n]) * op("S-", s, n) * op("S+", s, n+1)
+    @test t1odd[div(n, 2) + 1] ≈ exp(-im * dt * h₁₂)
+
+    # Second operator in the odd subsequence
+    # (this holds if N > 4!)
+    n = 3
+    h₃₄ =
+        0.5ε[n] * op("Sz", s, n) * op(I, s, n+1) +
+        0.5ε[n + 1] * op(I, s, n) * op("Sz", s, n+1) +
+        λ[n] * op("S+", s, n) * op("S-", s, n+1) +
+        conj(λ[n]) * op("S-", s, n) * op("S+", s, n+1)
+    @test t1odd[div(n, 2) + 1] ≈ exp(-im * dt * h₃₄)
+
+    # First operator in the even subsequence
+    n = 2
+    h₂₃ =
+        0.5ε[n] * op("Sz", s, n) * op(I, s, n+1) +
+        0.5ε[n + 1] * op(I, s, n) * op("Sz", s, n+1) +
+        λ[n] * op("S+", s, n) * op("S-", s, n+1) +
+        conj(λ[n]) * op("S-", s, n) * op("S+", s, n+1)
+    @test t1even[div(n, 2)] ≈ exp(-im * dt * h₂₃)
 end

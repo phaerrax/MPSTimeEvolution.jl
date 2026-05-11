@@ -50,6 +50,8 @@ include("vidalmps/algebra.jl")
 include("vidalmps/to_mps.jl")
 include("vidalmps/apply.jl")
 
+include("opsum_to_tebdsequence.jl")
+
 include("physical_systems.jl")
 
 end # module
