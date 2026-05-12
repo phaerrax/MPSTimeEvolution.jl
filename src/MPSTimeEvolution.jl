@@ -22,14 +22,22 @@ struct TDVP1 <: TDVP end
 struct TDVP1vec <: TDVP end
 struct TDVP2 <: TDVP end
 
+struct TEBD end
+
+# Vidal-form MPS
+include("vidalmps/definition.jl")
+include("vidalmps/indices.jl")
+include("vidalmps/algebra.jl")
+include("vidalmps/to_mps.jl")
+include("vidalmps/apply.jl")
+
 include("itensor.jl")
 include("callback.jl")
 include("localoperator.jl")
 include("expvalue_callback.jl")
 include("superfermion_callback.jl")
-include("utils.jl")
 
-#include("tebd.jl")
+include("utils.jl")
 
 # TDVP base functions
 include("timedependentsum.jl")

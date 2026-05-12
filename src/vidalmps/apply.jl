@@ -115,11 +115,10 @@ function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
     return ψ
 end
 
-function simplified_self_contraction(ψ::VidalMPS, A::ITensor, j)
-    # Compute ⟨ψ, Aψ⟩ by contracting only the site tensor on which A acts (we could deduce
-    # site_n from A, but we already know it anyway when we call this function, so let's use
-    # it).  If the opposite tensors are directly contracted with each other, the following
-    # cancellation rules hold:
+function simplified_self_contraction(ψ::VidalMPS, A::ITensor)
+    # Compute ⟨ψ, Aψ⟩ by contracting only the site tensors on which A acts.  If the opposite
+    # tensors are directly contracted with each other, the following cancellation rules
+    # hold:
     #
     #   Γ[1]───       ╭───
     #    │            │
@@ -149,7 +148,8 @@ function simplified_self_contraction(ψ::VidalMPS, A::ITensor, j)
     #   ───Γ[k]───Λ[k]───╯                     ───╯
     #
     #
-    # This means that we don't actually need to compute the full contraction:
+    # This means that we don't actually need to compute the full contraction. For example,
+    # if A is a single-site operator acting on site j:
     #
     #     ○──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──○─╶╶   ╶╶─○──◇──○──◇──○
     #     │     │     │         │     │     │         │     │     │
@@ -182,15 +182,24 @@ function simplified_self_contraction(ψ::VidalMPS, A::ITensor, j)
     #                           ╰──◇──○──◇──╯
     #                                 j
 
-    Mⱼ = bond_tensors(ψ)[j - 1] * site_tensors(ψ)[j] * bond_tensors(ψ)[j]
-    contr_pre = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[1:(j - 2)]; init=1.0)
-    contr_post = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[(j + 1):end]; init=1.0)
+    active_sites = findsites(ψ, A)
+    site_range = first(active_sites):last(active_sites)
+    Mⱼ =
+        bond_tensors(ψ)[first(site_range) - 1] *
+        prod(site_tensors(ψ)[j] * bond_tensors(ψ)[j] for j in site_range)
+    contr_pre = prod(
+        scalar(Λ*Λ) for Λ in bond_tensors(ψ)[1:(first(site_range) - 2)]; init=1.0
+    )
+    contr_post = prod(
+        scalar(Λ*Λ) for Λ in bond_tensors(ψ)[(last(site_range) + 1):end]; init=1.0
+    )
     return contr_pre * contr_post * inner(Mⱼ, apply(A, Mⱼ))
 end
 
 """
     expect(ψ::VidalMPS, op::AbstractString...; kwargs...)
     expect(ψ::VidalMPS, op::Matrix{<:Number}...; kwargs...)
+    expect(ψ::VidalMPS, op::LocalOperator...; kwargs...)
     expect(ψ::VidalMPS, ops; kwargs...)
 
 Given a `VidalMPS` `ψ` and a single operator name, returns a vector of the expected value of
@@ -231,7 +240,7 @@ function ITensorMPS.expect(ψ::VidalMPS, ops; sites=1:nsites(ψ))
             # inside braces after a type, for example `Int` in `Vector{Int}`). Examples:
             # `Array{ITensors}` becomes `Array`, and `Vector{Real}` becomes `Vector`.
 
-            val = simplified_self_contraction(ψ, oⱼ, j) / norm2_ψ
+            val = simplified_self_contraction(ψ, oⱼ) / norm2_ψ
             ex[n][entry] = (el_types[n] <: Real) ? real(val) : val
         end
     end

@@ -41,6 +41,10 @@ Base.getindex(op::LocalOperator, key) = Base.getindex(op.terms, key)
 
 Base.show(io::IO, op::LocalOperator) = print(io, name(op))
 
+function ITensors.op(l::LocalOperator, sites::Vector{<:Index})
+    return prod(op(opn, sites, j) for (opn, j) in zip(factors(l), domain(l)))
+end
+
 """
     mpo(sites::Vector{<:Index}, l::LocalOperator)
 
@@ -169,3 +173,21 @@ end
 # the string, and then ensure that there is only one operator (`only` throws an error if the
 # collection has more than one element).
 LocalOperator(s::AbstractString) = only(parseoperators(s))
+
+function ITensorMPS.expect(ψ::VidalMPS, lop::LocalOperator)
+    # Adapted from the main `expect(::VidalMPS, ...)` method.
+    ψ = copy(ψ)
+    ElT = NDTensors.scalartype(ψ)
+    s = siteinds(ψ)
+
+    Op = op(lop, s)
+    el_type = ishermitian(Op) ? real(ElT) : ElT
+
+    norm2_ψ = norm(ψ)^2
+    iszero(norm2_ψ) && error("VidalMPS has zero norm in function `expect`")
+
+    val = simplified_self_contraction(ψ, Op) / norm2_ψ
+    ex = (el_type <: Real) ? real(val) : val
+
+    return ex
+end
