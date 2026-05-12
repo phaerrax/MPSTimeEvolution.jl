@@ -52,13 +52,9 @@ include("tdvp_variants/adjtdvp1vec.jl")
 include("tdvp_variants/tdvp_other.jl")
 include("tdvp_variants/jointtdvp1.jl")
 
-include("vidalmps/definition.jl")
-include("vidalmps/indices.jl")
-include("vidalmps/algebra.jl")
-include("vidalmps/to_mps.jl")
-include("vidalmps/apply.jl")
-
+# TEBD
 include("opsum_to_tebdsequence.jl")
+include("tebd.jl")
 
 include("physical_systems.jl")
 

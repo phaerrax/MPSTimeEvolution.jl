@@ -25,25 +25,27 @@ end
 end
 
 include("norm_preservation.jl")
-@testset verbose=true "Norm/trace preservation" begin
-    dt = 0.01
-    tmax = 0.5
-    N = 5
-    @testset "Standard TDVP1" begin
-        @test tdvp1_preserves_norm(; dt=dt, tmax=tmax, N=N)
-    end
-    @testset "Vectorised TDVP1" begin
-        @test tdvp1vec_preserves_trace(; dt=dt, tmax=tmax, N=N)
-    end
-    @testset "Adaptive TDVP1" begin
-        @test adaptivetdvp1_preserves_trace(; dt=dt, tmax=tmax, N=N)
-    end
-end
-
 include("compare_tdvp_methods.jl")
-@testset verbose = true "TDVP1 methods" begin
-    # These tests push the bond dimension to the maximum admitted by the sizes of the system,
-    # so it's best to keep N relatively low so that the computation doesn't get too heavy.
+
+@testset verbose=true "TDVP1 methods" begin
+    @testset verbose=true "Norm/trace preservation" begin
+        dt = 0.01
+        tmax = 0.5
+        N = 5
+        @testset "Standard TDVP1" begin
+            @test tdvp1_preserves_norm(; dt=dt, tmax=tmax, N=N)
+        end
+        @testset "Vectorised TDVP1" begin
+            @test tdvp1vec_preserves_trace(; dt=dt, tmax=tmax, N=N)
+        end
+        @testset "Adaptive TDVP1" begin
+            @test adaptivetdvp1_preserves_trace(; dt=dt, tmax=tmax, N=N)
+        end
+    end
+
+    # These tests push the bond dimension to the maximum admitted by the sizes of the
+    # system, so it's best to keep N relatively low so that the computation doesn't get too
+    # heavy.
     dt = 0.01
     tmax = 0.5
     N = 6
@@ -362,5 +364,16 @@ end
         @test t2odd[div(1, 2) + 1] ≈ exp(-im * dt/2 * h₁₂)
         @test t2odd[div(3, 2) + 1] ≈ exp(-im * dt/2 * h₃₄)
         @test t2even[div(2, 2)] ≈ exp(-im * dt * h₂₃)
+    end
+
+    @testset "TEBD1 evolution" begin
+        dt = 0.01
+        tmax = 0.5
+        cb = ExpValueCallback("Sz(" * join(1:N, ",") * ")", s, dt)
+        v = MPS(s, n -> n == 1 ? "Up" : "Dn")
+        vv = convert(VidalMPS, v)
+        norm_init = norm(vv)
+        tebd1!(vv, h, dt, tmax; cutoff=1e-12, maxdim=10, progress=false, callback=cb);
+        @test norm(vv) ≈ norm_init
     end
 end

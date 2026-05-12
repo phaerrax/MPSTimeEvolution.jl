@@ -225,7 +225,7 @@ function append_if_not_null(filename::AbstractString, str::AbstractString)
     end
 end
 
-function simulationinfo(x::MPS, current_time, stime; digits=3)
+function simulationinfo(x::Union{MPS,VidalMPS}, current_time, stime; digits=3)
     return () -> [
         ("t", current_time),
         ("Maximum bond dimension", maxlinkdim(x)),
