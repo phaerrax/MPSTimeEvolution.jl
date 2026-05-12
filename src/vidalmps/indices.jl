@@ -1,4 +1,4 @@
-export leftlinkind, rightlinkind, leftlinkinds, rightlinkinds
+export leftlinkind, rightlinkind, leftlinkinds, rightlinkinds, linkdim, linkdims, maxlinkdim
 
 ### Index getting/setting utilities
 
@@ -351,4 +351,41 @@ function ITensorMPS.check_hascommoninds(::typeof(siteinds), A::VidalMPS, B::Vida
     end
 
     return nothing
+end
+
+"""
+    linkdim(ψ::MPS, j::Integer)
+
+Get the dimension of the link or bond connecting the `j`-th site the `j+1`-th site of the
+MPPS.
+
+If there is no link Index, return `nothing`.
+"""
+function ITensorMPS.linkdim(ψ::VidalMPS, b::Integer)
+    # The b-th site is connected to the b+1-th one by the bond tensor `bond_tensors(ψ)[b]`,
+    # that has two indices of the same dimension, obtained by `rightlinkind(ψ, b)` or
+    # `leftlinkind(ψ, b+1)`.
+    l = rightlinkind(ψ, b)
+
+    isnothing(l) && return nothing
+    return dim(l)
+end
+
+ITensorMPS.linkdims(ψ::VidalMPS) = [linkdim(ψ, b) for b in 1:(length(ψ) - 1)]
+
+"""
+    maxlinkdim(ψ::VidalMPS)
+
+Get the maximum link dimension of the MPS.
+
+The minimum this will return is `1`, even if there are no link indices.
+"""
+function ITensorMPS.maxlinkdim(ψ::VidalMPS)
+    md = 1
+    for b in 1:(nsites(ψ) - 1)
+        l = rightlinkind(ψ, b)
+        linkdim = isnothing(l) ? 1 : dim(l)
+        md = max(md, linkdim)
+    end
+    return md
 end
