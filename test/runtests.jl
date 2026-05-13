@@ -376,4 +376,15 @@ end
         tebd1!(vv, h, dt, tmax; cutoff=1e-12, maxdim=10, progress=false, callback=cb);
         @test norm(vv) ≈ norm_init
     end
+
+    @testset "TEBD2 evolution" begin
+        dt = 0.01
+        tmax = 0.5
+        cb = ExpValueCallback("Sz(" * join(1:N, ",") * ")", s, dt)
+        v = MPS(s, n -> n == 1 ? "Up" : "Dn")
+        vv = convert(VidalMPS, v)
+        norm_init = norm(vv)
+        tebd2!(vv, h, dt, tmax; cutoff=1e-12, maxdim=10, progress=false, callback=cb);
+        @test norm(vv) ≈ norm_init
+    end
 end
