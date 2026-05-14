@@ -1,4 +1,4 @@
-using Documenter, DocumenterCitations
+using Documenter, DocumenterCitations, DocumenterInterLinks
 using MPSTimeEvolution
 
 # doctest dependencies
@@ -6,6 +6,10 @@ using ITensors, ITensorMPS, KrylovKit, LindbladVectorizedTensors
 using CSV, DataFrames, Plots
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style=:numeric)
+
+extlinks = InterLinks(
+    "ITensorMPS" => "https://docs.itensor.org/ITensorMPS/dev/objects.inv"
+)
 
 makedocs(;
     modules=[MPSTimeEvolution],
@@ -18,6 +22,7 @@ makedocs(;
         "Reference" => [
             "Local operators" => "reference/localoperators.md",
             "Callback objects" => "reference/callback_obj.md",
+            "Vidal-form MPSs" => "reference/vidal_mps.md",
             "Complete reference" => "reference/reference.md",
         ],
         "Tutorial" => [
@@ -26,9 +31,10 @@ makedocs(;
             "examples/time_dependent_tdvp.md",
             "examples/tdvp1_sf.md",
             "examples/tdvp1_adaptive.md",
+            "examples/tebd.md",
         ],
     ],
-    plugins=[bib],
+    plugins=[bib, extlinks],
     format=Documenter.HTML(;
         mathengine=Documenter.MathJax3(
             Dict(

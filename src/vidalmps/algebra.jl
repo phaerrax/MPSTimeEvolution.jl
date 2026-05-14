@@ -5,12 +5,19 @@ using NDTensors.BackendSelection: @Algorithm_str, Algorithm
 """
     inner(A::VidalMPS, B::VidalMPS)
 
-Compute the inner product `⟨A|B⟩`.
+Compute the inner product `⟨A,B⟩`.
 
 Same as [`dot`](@ref).
 """
 ITensorMPS.inner(ψ1::VidalMPS, ψ2::VidalMPS) = dot(ψ1, ψ2)
 
+"""
+    dot(A::VidalMPS, B::VidalMPS)
+
+Compute the inner product `⟨A,B⟩`.
+
+Same as [`inner`](@ref).
+"""
 function LinearAlgebra.dot(ψ1::VidalMPS, ψ2::VidalMPS)::Number
     N = nsites(ψ1)
     if nsites(ψ2) != N
