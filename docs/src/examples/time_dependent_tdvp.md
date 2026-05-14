@@ -1,5 +1,12 @@
 # Time-dependent TDVP1
 
+!!! error "Time-dependent solver no longer in ITensorMPS"
+    Since [version
+0.4.0](https://github.com/ITensor/ITensorMPS.jl/releases/tag/v0.4.0]), the
+    `TimeDependentSum` functionality was removed from the ITensorMPS package,
+    which means that the following tutorial will not run with version ITensorMPS
+    version 0.4.0 or higher.
+
 In this tutorial we will see how to solve the Schrödinger equation with a
 time-dependent Hamiltonian using the TDVP1 method.
 
@@ -46,7 +53,7 @@ Let's define these operators with ITensor.
 We also choose as the initial condition a state where all sites contain an
 electron in the “down” state.
 
-```jldoctest time_dependent_tdvp
+```julia-repl time_dependent_tdvp
 julia> using ITensorMPS, MPSTimeEvolution
 
 julia> N = 6; s = siteinds("Electron", N);
@@ -84,7 +91,7 @@ normally implicitly set to the default solver, the `exponentiate` method from
 First, we define a time-dependent version of `exponentiate` (with the same
 structure as `exponentiate`):
 
-```jldoctest time_dependent_tdvp; filter = r"time_dependent_exp (generic function with \d\+ methods?)", output = false
+```julia-repl time_dependent_tdvp; filter = r"time_dependent_exp (generic function with \d\+ methods?)", output = false
 julia> using KrylovKit: exponentiate
 
 julia> using ITensorMPS: TimeDependentSum
@@ -105,7 +112,7 @@ means that it can be used to define a function like \\(H(t)\\).
 In our case, we can write \\(H(t)\\) from \eqref{eq:time-dependent-hamiltonian}
 as follows, once we choose a value for \\(T\\):
 
-```jldoctest time_dependent_tdvp
+```julia-repl time_dependent_tdvp
 julia> T = 2;
 
 julia> ramp(t) = min(t / T, one(t));
@@ -117,7 +124,7 @@ Here `one` is the function that returns the multiplicative identity for its
 argument, i.e. `one(t)` returns `1.0` if `t` is a `Float64`.
 We define the time-dependent solver as follows:
 
-```jldoctest time_dependent_tdvp; filter = r"time_dependent_solver (generic function with \d\+ methods?)", output = false
+```julia-repl time_dependent_tdvp; filter = r"time_dependent_solver (generic function with \d\+ methods?)", output = false
 julia> function time_dependent_solver(PHs::ProjMPOSum, time_step, ψ₀; kwargs...)
            return time_dependent_exp(
                TimeDependentSum(fs, PHs), time_step, ψ₀; ishermitian=true, kwargs...
@@ -145,7 +152,7 @@ method.
 
 Now we set the variables related to time, and the callback operator:
 
-```jldoctest time_dependent_tdvp
+```julia-repl time_dependent_tdvp
 julia> dt = 0.01; tmax = 2T;
 
 julia> cb = ExpValueCallback("Nup(1,5),Ndn(1,5)", s, dt)
@@ -161,7 +168,7 @@ defined by ITensorMPS, so we need to do a bit of “plumbing” ourselves.
 Specifically, we need to extend the two `Base.iterate` methods to the
 `ProjMPOSum` type, so that Julia can use them:
 
-```jldoctest time_dependent_tdvp
+```julia-repl time_dependent_tdvp
 julia> Base.iterate(PH::ProjMPOSum, state) = iterate(PH.terms, state)
 
 julia> Base.iterate(PH::ProjMPOSum) = iterate(PH.terms)
@@ -181,7 +188,7 @@ julia> Base.iterate(PH::ProjMPOSum) = iterate(PH.terms)
 Now that `iterate` is properly extended, we can finally call `tdvp1!` with
 everything we defined:
 
-```jldoctest time_dependent_tdvp
+```julia-repl time_dependent_tdvp
 julia> tdvp1!(
            time_dependent_solver,
            ψ₀,
