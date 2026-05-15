@@ -7,10 +7,16 @@ It is based on the [ITensor](https://itensor.org/) library.
 
 ## Package features
 
-The package contains an implementation of the one-site time-dependent variational principle (TDVP1) [Lubich2015:tdvp_evolution,Haegeman2016:unifying_time_evolution_optimization_mps,Paeckel2019:time_evolution_methods](@cite) in its standard version, together with:
+The package implements:
 
-* the variant with adaptive bond dimensions [Dunnett2021:adaptive_tdvp1](@cite),
-* the non-unitary version (for vectorised mixed states).
+* the one-site time-dependent variational principle (TDVP1)
+  [Lubich2015:tdvp_evolution,Haegeman2016:unifying_time_evolution_optimization_mps,Paeckel2019:time_evolution_methods](@cite),
+  in its standard version as well as
+   * its variant with adaptive bond dimensions [Dunnett2021:adaptive_tdvp1](@cite),
+   * a non-unitary version (for vectorised mixed states);
+* matrix-product states in the *Vidal* (or *canonical*) gauge,
+* the time-evolving block-decimation algorithm (TEBD) for Vidal-form MPS,
+  together with automatic 1st and 2nd order Suzuki-Trotter decompositions.
 
 See [Reference](@ref) for a complete list of features, and a description of the
 available methods.

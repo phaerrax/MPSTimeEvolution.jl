@@ -21,25 +21,23 @@ by Vidal [Vidal2003:slightly_entangled](@cite), this kind of MPS takes the form
 \end{equation}
 ```
 
-in which we have a *site tensor* \\(\Gamma^{(k,i\sb{k})}\\) for each degree of
+in which we have a *site tensor* \\(\Gamma^{(k)}\\) for each degree of
 freedom of the system and a *bond tensor* \\(\Lambda^{(k)}\\), namely a
 non-negative diagonal matrix, associated to each bond.
 In this package, a Vidal-form MPS is represented by the `VidalMPS` type, which
 is little more than a container of the two arrays of *site* and *bond*
 tensors.
 
-```@docs; canonical=false
-VidalMPS
-```
-
 An important feature of Vidal-form MPSs is their orthonormality rules, that
-allow simplifying many calculations. They are:
+allow simplifying many calculations. They are
 
 ```math
 \begin{equation}
     \begin{aligned}
-        \sum_{i_k} \adj{(\Gamma^{(k,i_k)})} \adj{(\Lambda^{(k-1)})} \Lambda^{(k-1)} \Gamma^{(k,i_k)} &= \tr(\Lambda^{(k-1)\,2)},\\
-        \sum_{i_k} \adj{(\Gamma^{(k,i_k)})} \Lambda^{(k)} \adj{(\Lambda^{(k)})} \Gamma^{(k,i_k)} &= \tr(\Lambda^{(k)\,2}),
+        \sum_{i_k} \Gamma^{(k,i_k)\dagger} \Lambda^{(k-1)\dagger}
+            \Lambda^{(k-1)} \Gamma^{(k,i_k)} &= \tr(\Lambda^{(k-1)2}),\\
+        \sum_{i_k} \Gamma^{(k,i_k)} \Lambda^{(k)} \adj{(\Lambda^{(k)})}
+            \Gamma^{(k,i_k)\dagger} &= \tr(\Lambda^{(k)2}),
     \end{aligned}
 \label{eq:vidalmps_cancellation_rules}
 \end{equation}
@@ -63,7 +61,10 @@ The type is designed to follow the same interface as ordinary MPSs from ITensor.
 
 ### Constructors
 
-You can construct a trivial (i.e. a tensor-product) Vidal-form MPS with the same syntax as ordinary MPSs, that is, by specifying a list of site indices and a list of strings denoting the states, or a function of the site number, and so on.
+You can construct a trivial (i.e. a tensor-product) Vidal-form MPS with the same
+syntax as ordinary MPSs, that is, by specifying a list of site indices and a
+list of strings denoting the states, or a function of the site number, and so
+on.
 
 ```jldoctest vidalmps; setup = :(using ITensorMPS, MPSTimeEvolution), filter = r"id=\d+" => "id=###"
 julia> s = siteinds("S=1/2", 4);
@@ -130,7 +131,7 @@ julia> convert(MPS, vv; ortho_center=3)
  ((dim=2|id=643|"S=1/2,Site,n=4"), (dim=2|id=826|"Link,l=3"))
 
 ```
- 
+
 ### Vector operations
 
 In order to multiply a `VidalMPS` by a scalar (complex) number, or to add two or
@@ -163,9 +164,10 @@ julia> +(vv, ww; alg="densitymatrix");
 
 ### Bond dimension truncation
 
-The Vidal-form MPS can be compressed at a specified bond \\(k\\) by deleting the singular values in \\(\Lambda^{(k)}\\) under a certain cutoff, or beyond a certain number, through a singular-value decomposition.
-This can be done simply by calling the `truncate` function (or its in-place
-version `truncate!`).
+The Vidal-form MPS can be compressed at a specified bond \\(k\\) by deleting the
+singular values in \\(\Lambda^{(k)}\\) under a certain cutoff, or beyond a
+certain number, through a singular-value decomposition.  This can be done by
+calling the `truncate` function (or its in-place version `truncate!`).
 
 ```jldoctest vidalmps
 julia> truncate!(vv; cutoff=1e-12, site_range=3:3);
@@ -198,20 +200,20 @@ julia> apply(Sy2Sy3, vv; cutoff=1e-14);
 
 ```
 
-The result can be truncated (just as in the `truncate` function) by using the
-`cutoff` and `maxdim` keyword arguments.
+The result can be truncated by using the `cutoff` and `maxdim` keyword
+arguments, in the same manner as with the `truncate` function.
 
 ### Inner products and expectation values
 
 The `inner` (or `dot`) function implements the inner product between two
-Vidal-form MPS, and the norm of an MPS can be retrieved with `norm`.
-The `norm` function in practice doesn't compute the full inner product between a
+Vidal-form MPS, and the norm of an MPS can be retrieved with `norm`.  The `norm`
+function, in practice, doesn't compute the full inner product between a
 `VidalMPS` and itself, but uses the cancellation rules in
 \eqref{eq:vidalmps_cancellation_rules} to obtain the norm just by computing the
 trace of the square of the bond tensors:
 
 ```math
-\norm{\psi}^2 = \prod_{k=1}^{n-1} \tr(\Lambda^{(k)\, 2)
+\norm{\psi}^2 = \prod_{k=1}^{n-1} \tr(\Lambda^{(k)2}).
 ```
 
 Expectation values of single-site operators can be computed via the `expect`

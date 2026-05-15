@@ -1,8 +1,8 @@
 # Time-evolving block decimation
 
 The time-evolving block-decimation (TEBD) algorithm, introduced in
-[Vidal2003:slightly_entangled](@cite) is the ideal time-evolution scheme to
-simulate one-dimensional many-body systems that are characterised by at most
+[Vidal2004:tebd](@cite) is the ideal time-evolution scheme to simulate
+one-dimensional many-body systems that are characterised by at most
 nearest-neighbour interactions.
 With the quantum state encoded in a Vidal-form MPS, the TEBD algorithm can be
 straightforwardly parallelised due to the Suzuki–Trotter decomposition of the
@@ -74,7 +74,17 @@ The `tebd1!` function evolves the `VidalMPS` `ψₜ` according to the specified
 Hamiltonian. It is enough to specfy the (full) Hamiltonian operator as an
 `OpSum` object: the `tebd1!` function will take care of computing the
 Suzuki-Trotter decomposition in odd and even terms.
-We also need to provide the `maxdim` and `cutoff` keyword argument in order to
+
+!!! info "Suzuki-Trotter decomposition"
+    In the decomposition, a single-site operators \\(h_k\\) on site \\(k\\) is
+    split simmetrically between the evolution operator on sites \\((k-1,k)\\)
+    and \\((k, k+1)\\).
+    As of the time this guide was written, the Hamiltonian provided to the TEBD
+    function (as an `OpSum`) can admit only single-site or nearest-neighbour
+    two-site operators. Specifically, interaction between non-nearest-neighbour
+    sites are not allowed.
+
+We need to provide the `maxdim` and `cutoff` keyword argument in order to
 describe how the MPS has to be truncated after the application of the two-site
 time-evolution operators.
 
@@ -102,7 +112,7 @@ U(t) = U_{odd}(t/2) U_{even}(t) U_{odd}(t/2);
 if we don't need to compute the expectation values in `cb` after each time step,
 we can merge the \\(U\sb{odd}(t/2)\\) in the \\(U(t)\\) across time steps, i.e.
 
-```math 
+```math
 U(t)^k = U_{odd}(t/2) U_{even}(t) \bigl(U_{odd}(t) U_{even}(t)\bigr)^{k-1} U_{odd}(t/2)
 ```
 
