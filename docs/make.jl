@@ -7,9 +7,7 @@ using CSV, DataFrames, Plots
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style=:numeric)
 
-extlinks = InterLinks(
-    "ITensorMPS" => "https://docs.itensor.org/ITensorMPS/dev/objects.inv"
-)
+extlinks = InterLinks("ITensorMPS" => "https://docs.itensor.org/ITensorMPS/dev/objects.inv")
 
 makedocs(;
     modules=[MPSTimeEvolution],

@@ -8,7 +8,24 @@ function tebd_step!(ψₜ::VidalMPS, gates; cutoff, maxdim)
     site_ts = site_tensors(ψₜ)
     bond_ts = bond_tensors(ψₜ)
 
-    Threads.@threads for u in gates
+    Threads.@threads :greedy for u in gates
+        # The `:greedy` scheduler spawns a certain number N of tasks, each greedily working
+        # on the given iterated values as they are produced. This means that (say, for the
+        # odd-step routine) task 1 applies u₁₂, task 2 is assigned u₃₄, and so on, until the
+        # number of tasks is exhausted. As soon as one task finishes its work, it takes the
+        # next value from the iterator, i.e. it goes on to apply the first uⱼ,ⱼ₊₁ operator
+        # still waiting to be applied.
+        # In contrast, with the default `:dynamic` scheduler each task processes contiguous
+        # regions of the iteration space, meaning that the first task is assigned gates 1 to
+        # k, task 2 is assigned gates k+1 to 2k, and so on, with k approximately equal to
+        # length(gates) / N.
+        # This scheduling option is a good choice in our case, because the workload of
+        # individual iterations may not be uniform, i.e. in TEDOPA simulations where the
+        # sites close to the central system require heavier calculations.
+        # With the default scheduler instead, in this case the tasks which are assigned
+        # the regions far from the system would finish immediately, whereas task 1 (which is
+        # assigned the region with the system) would take a lot longer, effectively
+        # stalling the parallel algorithm.
         j1, j2 = findsites(ψₜ, u)
         @assert j2 == j1 + 1
         j = j1
@@ -31,13 +48,7 @@ function tebd_step!(ψₜ::VidalMPS, gates; cutoff, maxdim)
     return nothing
 end
 
-"""
-    tebd1!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
-
-Integrate the Schrödinger equation ``d/dt ψₜ = -i H ψₜ`` using the TEBD algorithm with a
-1st-order Trotter-Suzuki decomposition for ``H``, where `ψₜ` is a MPS in the Vidal form,
-representing the state of the system.
-
+tebd_arguments_docstring = """
 # Other arguments
 
 * `dt`: time step of the evolution.
@@ -50,6 +61,16 @@ representing the state of the system.
   evolution.
 * `cutoff=1e-15`: cutoff for truncating small singular values during the evolution.
 * `progress=true`: whether to display a progress bar during the evolution.
+"""
+
+"""
+    tebd1!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
+
+Integrate the Schrödinger equation ``d/dt ψₜ = -i H ψₜ`` using the TEBD algorithm with a
+1st-order Trotter-Suzuki decomposition for ``H``, where `ψₜ` is a MPS in the Vidal form,
+representing the state of the system.
+
+$tebd_arguments_docstring
 """
 function tebd1!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
     nsteps = floor(Int, tmax / dt)
@@ -111,18 +132,11 @@ Integrate the Schrödinger equation ``d/dt ψₜ = -i H ψₜ`` using the TEBD a
 2nd-order Trotter-Suzuki decomposition for ``H``, where `ψₜ` is a MPS in the Vidal form,
 representing the state of the system.
 
-# Other arguments
+If a callback is specified, and expectation values are not required at each time step, this
+function will combine the final set of gates of a time step with the first set of gates of
+the following one, for all steps between two measurements.
 
-* `dt`: time step of the evolution.
-* `tmax`: end time of the evolution.
-
-# Optional keyword arguments (with default values)
-
-* `callback`: a callback object describing the observables.
-* `maxdim=maxlinkdim(ψₜ)`: the maximum allowed bond dimension of the state during the
-  evolution.
-* `cutoff=1e-15`: cutoff for truncating small singular values during the evolution.
-* `progress=true`: whether to display a progress bar during the evolution.
+$tebd_arguments_docstring
 """
 function tebd2!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
     nsteps = floor(Int, tmax / dt)
