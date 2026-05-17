@@ -405,3 +405,19 @@ end
         @test norm(vv) ≈ norm_init
     end
 end
+
+@testset verbose=true "Inverse-canonical MPSs" begin
+    N = 8
+    s = siteinds("S=1/2", N)
+    x = random_mps(ComplexF64, s; linkdims=4)
+    x_ican = convert(InverseCanonicalMPS, x)
+    @test MPSTimeEvolution.check_inverse_canonical_form(x_ican)
+    @test MPSTimeEvolution.check_inverse_canonical_form(InverseCanonicalMPS(s, "Up"))
+
+    @testset "Conversion to/from MPS" begin
+        @test all(1:N) do n
+            v = convert(MPS, x_ican; ortho_center=n)
+            norm(v) ≈ inner(v[n], v[n])
+        end
+    end
+end

@@ -24,12 +24,12 @@ struct TDVP2 <: TDVP end
 
 struct TEBD end
 
-# Vidal-form MPS
-include("vidalmps/definition.jl")
-include("vidalmps/indices.jl")
-include("vidalmps/algebra.jl")
-include("vidalmps/to_mps.jl")
-include("vidalmps/apply.jl")
+# Vidal-form and inverse-canonical MPS
+include("canonical_mps/definition.jl")
+include("canonical_mps/indices.jl")
+include("canonical_mps/to_mps.jl")
+include("canonical_mps/algebra.jl")
+include("canonical_mps/apply.jl")
 
 include("itensor.jl")
 include("callback.jl")

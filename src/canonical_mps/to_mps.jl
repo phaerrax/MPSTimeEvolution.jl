@@ -1,5 +1,3 @@
-### MPS <-> VidalMPS conversion functions
-
 # VidalMPS to MPS: merge the bond indices into the site indices.
 function Base.convert(::Type{MPS}, ψ::VidalMPS; ortho_center=1)
     N = nsites(ψ)
@@ -127,4 +125,81 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; cutoff=1e-8)
     # and return.
     return norm_ψ *
            VidalMPS(site_ts, OffsetVector([ITensor(1.0); bond_ts; ITensor(1.0)], 0:N))
+end
+
+# InverseCanonicalMPS to MPS: contract Cₖ and Vₖ to get Aₖ, and contract Vₖ and Cₖ₊₁ to
+# obtain Bₖ. The remaining site tensor is the orthocentre.
+function Base.convert(::Type{MPS}, ψ::InverseCanonicalMPS; ortho_center=1)
+    N = nsites(ψ)
+    M = Vector{ITensor}(undef, N)
+
+    for n in 1:(ortho_center - 1)
+        # To the left of the orthocenter: M[n] = C[n] V[n]
+        M[n] = site_tensors(ψ)[n] * bond_tensors(ψ)[n]
+    end
+
+    # Orthocenter site: M[n] = C[n]
+    M[ortho_center] = site_tensors(ψ)[ortho_center]
+
+    for n in (ortho_center + 1):N
+        # To the right of the orthocenter: M[n] = V[n-1] C[n]
+        M[n] = bond_tensors(ψ)[n - 1] * site_tensors(ψ)[n]
+    end
+
+    # Restore the standard tags structure of an MPS created by ITensor. The tags resulting
+    # from the contractions above might be different from the standard, and this might
+    # create some problems for example with the `replaceinds!` function we use in
+    # `convert(InverseCanonicalMPS, ...)` below.
+    old_link_inds = [commonind(M[n], M[n + 1]) for n in 1:(N - 1)]
+    new_link_inds = [Index(dim(old_link_inds[n]); tags="Link,l=$n") for n in 1:(N - 1)]
+    for n in 1:(N - 1)
+        M[n] *= delta(old_link_inds[n], new_link_inds[n])
+    end
+    for n in 2:N
+        M[n] *= delta(old_link_inds[n - 1], new_link_inds[n - 1])
+    end
+    return MPS(M; ortho_lims=ortho_center:ortho_center)
+end
+
+# MPS to InverseCanonicalMPS: orthogonalise the MPS first, then use the SVD to separate the
+# bond tensors from the site tensors until we reach the opposite edge of the MPS.
+function Base.convert(::Type{InverseCanonicalMPS}, ψ::MPS; cutoff=1e-8)
+    # Cheap way of doing the conversion: first convert ψ to a VidalMPS, which takes care of
+    # performing the SVDs correctly. Then multiply/divide by the bond tensors accordingly.
+    return convert(InverseCanonicalMPS, convert(VidalMPS, ψ; cutoff=cutoff))
+end
+
+# VidalMPS to InverseCanonicalMPS: Vₖ = Λₖ⁻¹, and
+#   Cₖ = Λₖ⁻¹ Γₖ Λₖ,
+#   C₁ = Γ₁ Λ₁,
+#   Cₙ = Λₙ₋₁Γₙ.
+# With the trivial bond tensors Λ₀ = Λₙ = 1, the first equation holds for all k.
+function Base.convert(::Type{InverseCanonicalMPS}, ψ::VidalMPS)
+    N = nsites(ψ)
+    Γ = site_tensors(ψ)
+    Λ = bond_tensors(ψ)
+
+    ic_site_ts = [Λ[n - 1] * Γ[n] * Λ[n] for n in 1:N]
+    ic_bond_ts = [inv.(Λⱼ) for Λⱼ in Λ]
+
+    return InverseCanonicalMPS(ic_site_ts, ic_bond_ts)
+end
+
+# InverseCanonicalMPS to VidalMPS: Λₖ = Vₖ⁻¹, and
+#   Cₖ = Λₖ⁻¹ Γₖ Λₖ,
+#   C₁ = Γ₁ Λ₁,
+#   Cₙ = Λₙ₋₁Γₙ.
+function Base.convert(::Type{VidalMPS}, ψ::InverseCanonicalMPS)
+    N = nsites(ψ)
+    C = site_tensors(ψ)
+    V = bond_tensors(ψ)
+
+    c_site_ts = [
+        C[1] * V[1];
+        [V[n - 1] * C[n] * V[n] for n in 2:(N - 1)];
+        V[n - 1] * C[n]
+    ]
+    c_bond_ts = [inv.(Vⱼ) for Vⱼ in V]
+
+    return VidalMPS(c_site_ts, c_bond_ts)
 end

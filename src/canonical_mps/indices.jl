@@ -4,9 +4,10 @@ export leftlinkind, rightlinkind, leftlinkinds, rightlinkinds, linkdim, linkdims
 
 """
     findsites(ψ::VidalMPS, is)
+    findsites(ψ::InverseCanonicalMPS, is)
 
-Return the sites of the VidalMPS that have indices in common with the collection of site
-indices `is`.
+Return the sites of the MPS that have indices in common with the collection of site indices
+`is`.
 
 # Examples
 
@@ -17,19 +18,20 @@ findsites(ψ, s[3]) == [3]
 findsites(ψ, (s[4], s[1])) == [1, 4]
 ```
 """
-ITensorMPS.findsites(ψ::VidalMPS, is) = findall(hascommoninds(is), siteinds(ψ))
+ITensorMPS.findsites(ψ::ExplicitBondMPS, is) = findall(hascommoninds(is), siteinds(ψ))
 # Bond indices are internal, so we don't even consider them.
 
-ITensorMPS.findsites(ψ::VidalMPS, s::Index) = findsites(ψ, IndexSet(s))
+ITensorMPS.findsites(ψ::ExplicitBondMPS, s::Index) = findsites(ψ, IndexSet(s))
 
 """
     siteind(ψ::VidalMPS, j::Integer; kwargs...)
+    siteind(ψ::InverseCanonicalMPS, j::Integer; kwargs...)
 
-Return the site Index found on the `j`th site tensor of the VidalMPS.
+Return the site Index found on the `j`th site tensor of the MPS.
 
 You can choose different filters, like prime level and tags, with the `kwargs`.
 """
-function ITensors.SiteTypes.siteind(ψ::VidalMPS, j::Integer; kwargs...)
+function ITensors.SiteTypes.siteind(ψ::ExplicitBondMPS, j::Integer; kwargs...)
     N = nsites(ψ)
 
     return if N == 1
@@ -41,12 +43,13 @@ end
 
 """
     siteinds(ψ::VidalMPS, j::Integer; kwargs...)
+    siteinds(ψ::ExplicitBondMPS, j::Integer; kwargs...)
 
-Return the site indices found on the `j`th site of the VidalMPS.
+Return the site indices found on the `j`th site of the MPS.
 
 Optionally filter prime tags and prime levels with keyword arguments like `plev` and `tags`.
 """
-function ITensors.SiteTypes.siteinds(ψ::VidalMPS, j::Integer; kwargs...)
+function ITensors.SiteTypes.siteinds(ψ::ExplicitBondMPS, j::Integer; kwargs...)
     N = nsites(ψ)
 
     return if N == 1
@@ -58,18 +61,19 @@ function ITensors.SiteTypes.siteinds(ψ::VidalMPS, j::Integer; kwargs...)
     end
 end
 
-function ITensors.SiteTypes.siteinds(ψ::VidalMPS; kwargs...)
+function ITensors.SiteTypes.siteinds(ψ::ExplicitBondMPS; kwargs...)
     return [siteind(ψ, j; kwargs...) for j in 1:nsites(ψ)]
 end
 
 """
     leftlinkind(ψ::VidalMPS, j::Integer; kwargs...)
+    leftlinkind(ψ::InverseCanonicalMPS, j::Integer; kwargs...)
 
-Return the link Index pointing to the left of the `j`th site tensor of the VidalMPS.
+Return the link Index pointing to the left of the `j`th site tensor of the MPS.
 
 You can choose different filters, like prime level and tags, with the `kwargs`.
 """
-function leftlinkind(ψ::VidalMPS, j::Integer; kwargs...)
+function leftlinkind(ψ::ExplicitBondMPS, j::Integer; kwargs...)
     N = nsites(ψ)
 
     return if N == 1
@@ -79,7 +83,7 @@ function leftlinkind(ψ::VidalMPS, j::Integer; kwargs...)
     end
 end
 
-function leftlinkinds(ψ::VidalMPS, j::Integer; kwargs...)
+function leftlinkinds(ψ::ExplicitBondMPS, j::Integer; kwargs...)
     N = nsites(ψ)
 
     return if N == 1
@@ -91,12 +95,13 @@ end
 
 """
     rightlinkind(ψ::VidalMPS, j::Integer; kwargs...)
+    rightlinkind(ψ::InverseCanonicalMPS, j::Integer; kwargs...)
 
-Return the link Index pointing to the right of the `j`th site tensor of the VidalMPS.
+Return the link Index pointing to the right of the `j`th site tensor of the MPS.
 
 You can choose different filters, like prime level and tags, with the `kwargs`.
 """
-function rightlinkind(ψ::VidalMPS, j::Integer; kwargs...)
+function rightlinkind(ψ::ExplicitBondMPS, j::Integer; kwargs...)
     N = nsites(ψ)
 
     return if N == 1
@@ -106,7 +111,7 @@ function rightlinkind(ψ::VidalMPS, j::Integer; kwargs...)
     end
 end
 
-function rightlinkinds(ψ::VidalMPS, j::Integer; kwargs...)
+function rightlinkinds(ψ::ExplicitBondMPS, j::Integer; kwargs...)
     N = nsites(ψ)
 
     return if N == 1
@@ -118,12 +123,13 @@ end
 
 """
     linkinds(ψ::VidalMPS, j::Integer; kwargs...)
+    linkinds(ψ::InverseCanonicalMPS, j::Integer; kwargs...)
 
-Return the link Indices found of the VidalMPS at the site `j` as an IndexSet.
+Return the link Indices found of the MPS at the site `j` as an IndexSet.
 
 Optionally filter prime tags and prime levels with keyword arguments like `plev` and `tags`.
 """
-function ITensorMPS.linkinds(ψ::VidalMPS, j::Integer; kwargs...)
+function ITensorMPS.linkinds(ψ::ExplicitBondMPS, j::Integer; kwargs...)
     N = nsites(ψ)
 
     return if N == 1
@@ -136,15 +142,15 @@ function ITensorMPS.linkinds(ψ::VidalMPS, j::Integer; kwargs...)
     end
 end
 
-function leftlinkinds(ψ::VidalMPS; kwargs...)
+function leftlinkinds(ψ::ExplicitBondMPS; kwargs...)
     return [leftlinkind(ψ, j; kwargs...) for j in 2:nsites(ψ)]
 end
 
-function rightlinkinds(ψ::VidalMPS; kwargs...)
+function rightlinkinds(ψ::ExplicitBondMPS; kwargs...)
     return [rightlinkind(ψ, j; kwargs...) for j in 1:(nsites(ψ) - 1)]
 end
 
-function ITensorMPS.linkinds(ψ::VidalMPS; kwargs...)
+function ITensorMPS.linkinds(ψ::ExplicitBondMPS; kwargs...)
     return [linkinds(ψ, j; kwargs...) for j in 1:nsites(ψ)]
 end
 
@@ -152,7 +158,7 @@ end
 
 function ITensors.replaceinds!(
     ::typeof(linkinds),
-    ψ::VidalMPS,
+    ψ::ExplicitBondMPS,
     new_ls_left::Vector{<:Index},
     new_ls_right::Vector{<:Index},
 )
@@ -178,14 +184,14 @@ end
 
 function ITensors.replaceinds(
     ::typeof(linkinds),
-    ψ::VidalMPS,
+    ψ::ExplicitBondMPS,
     new_ls_left::Vector{<:Index},
     new_ls_right::Vector{<:Index},
 )
     return replaceinds!(linkinds, copy(ψ), new_ls_left, new_ls_right)
 end
 
-function Base.map!(f::Function, ψ::VidalMPS)
+function Base.map!(f::Function, ψ::ExplicitBondMPS)
     N = nsites(ψ)
     site_ts = site_tensors(ψ)
     for i in 1:N
@@ -200,10 +206,10 @@ function Base.map!(f::Function, ψ::VidalMPS)
     return ψ
 end
 
-Base.map(f::Function, ψ::VidalMPS) = map!(f, copy(ψ))
+Base.map(f::Function, ψ::ExplicitBondMPS) = map!(f, copy(ψ))
 
-function Base.map!(f::Function, ::typeof(linkinds), ψ::VidalMPS)
-    # Apply `f` to all link indices of the VidalMPS. In practice: replace the link indices
+function Base.map!(f::Function, ::typeof(linkinds), ψ::ExplicitBondMPS)
+    # Apply `f` to all link indices of the MPS. In practice: replace the link indices
     # `l` of each tensor in `ψ` with `f(l)`. Be careful not to apply `f` twice (or not?)!
     site_ts = site_tensors(ψ)
     bond_ts = bond_tensors(ψ)
@@ -230,9 +236,9 @@ function Base.map!(f::Function, ::typeof(linkinds), ψ::VidalMPS)
     return ψ
 end
 
-Base.map(f::Function, ::typeof(linkinds), ψ::VidalMPS) = map!(f, linkinds, copy(ψ))
+Base.map(f::Function, ::typeof(linkinds), ψ::ExplicitBondMPS) = map!(f, linkinds, copy(ψ))
 
-function Base.map!(f::Function, ::typeof(siteinds), ψ::VidalMPS)
+function Base.map!(f::Function, ::typeof(siteinds), ψ::ExplicitBondMPS)
     site_ts = site_tensors(ψ)
     N = nsites(ψ)
 
@@ -244,7 +250,7 @@ function Base.map!(f::Function, ::typeof(siteinds), ψ::VidalMPS)
     return ψ
 end
 
-Base.map(f::Function, ::typeof(siteinds), ψ::VidalMPS) = map!(f, siteinds, copy(ψ))
+Base.map(f::Function, ::typeof(siteinds), ψ::ExplicitBondMPS) = map!(f, siteinds, copy(ψ))
 
 for (fname, fname!) in [
     (:(ITensors.dag), :(ITensorMPS.dag!)),
@@ -261,17 +267,18 @@ for (fname, fname!) in [
     @eval begin
         """
             $($fname)[!](ψ::VidalMPS, args...; kwargs...)
+            $($fname)[!](ψ::InverseCanonicalMPS, args...; kwargs...)
 
-        Apply $($fname) to all ITensors of a VidalMPS, returning a new VidalMPS.
+        Apply $($fname) to all ITensors of the MPS, returning a new MPS.
 
-        The ITensors of the VidalMPS will be a view of the storage of the original ITensors.
+        The ITensors of the MPS will be a view of the storage of the original ITensors.
         Alternatively apply the function in-place.
         """
-        function $fname(ψ::VidalMPS, args...; kwargs...)
+        function $fname(ψ::ExplicitBondMPS, args...; kwargs...)
             return map(m -> $fname(m, args...; kwargs...), ψ)
         end
 
-        function $(fname!)(ψ::VidalMPS, args...; kwargs...)
+        function $(fname!)(ψ::ExplicitBondMPS, args...; kwargs...)
             return map!(m -> $fname(m, args...; kwargs...), ψ)
         end
     end
@@ -290,37 +297,45 @@ for (fname, fname!) in [
     @eval begin
         """
             $($fname)[!](linkinds, ψ::VidalMPS, args...; kwargs...)
+            $($fname)[!](linkinds, ψ::InverseCanonicalMPS, args...; kwargs...)
 
-        Apply $($fname) to all link indices of a VidalMPS, returning a new VidalMPS.
+        Apply $($fname) to all link indices of the MPS, returning a new MPS.
 
-        The ITensors of the VidalMPS will be a view of the storage of the original ITensors.
+        The ITensors of the MPS will be a view of the storage of the original ITensors.
         """
-        function $fname(ffilter::typeof(linkinds), ψ::VidalMPS, args...; kwargs...)
+        function $fname(ffilter::typeof(linkinds), ψ::ExplicitBondMPS, args...; kwargs...)
             return map(i -> $fname(i, args...; kwargs...), ffilter, ψ)
         end
 
-        function $(fname!)(ffilter::typeof(linkinds), ψ::VidalMPS, args...; kwargs...)
+        function $(fname!)(
+            ffilter::typeof(linkinds), ψ::ExplicitBondMPS, args...; kwargs...
+        )
             return map!(i -> $fname(i, args...; kwargs...), ffilter, ψ)
         end
 
         """
             $($fname)[!](siteinds, ψ::VidalMPS, args...; kwargs...)
+            $($fname)[!](siteinds, ψ::InverseCanonicalMPS, args...; kwargs...)
 
-        Apply $($fname) to all site indices of a VidalMPS, returning a new VidalMPS.
+        Apply $($fname) to all site indices of the MPS, returning a new MPS.
 
-        The ITensors of the VidalMPS will be a view of the storage of the original ITensors.
+        The ITensors of the MPS will be a view of the storage of the original ITensors.
         """
-        function $fname(ffilter::typeof(siteinds), ψ::VidalMPS, args...; kwargs...)
+        function $fname(ffilter::typeof(siteinds), ψ::ExplicitBondMPS, args...; kwargs...)
             return map(i -> $fname(i, args...; kwargs...), ffilter, ψ)
         end
 
-        function $(fname!)(ffilter::typeof(siteinds), ψ::VidalMPS, args...; kwargs...)
+        function $(fname!)(
+            ffilter::typeof(siteinds), ψ::ExplicitBondMPS, args...; kwargs...
+        )
             return map!(i -> $fname(i, args...; kwargs...), ffilter, ψ)
         end
     end
 end
 
-function ITensorMPS.hascommoninds(::typeof(siteinds), A::VidalMPS, B::VidalMPS)
+function ITensorMPS.hascommoninds(
+    ::typeof(siteinds), A::MPST, B::MPST
+) where {MPST<:ExplicitBondMPS}
     N = nsites(A)
     for n in 1:N
         if !hascommoninds(siteinds(A, n), siteinds(B, n))
@@ -330,12 +345,14 @@ function ITensorMPS.hascommoninds(::typeof(siteinds), A::VidalMPS, B::VidalMPS)
     return true
 end
 
-function ITensorMPS.check_hascommoninds(::typeof(siteinds), A::VidalMPS, B::VidalMPS)
+function ITensorMPS.check_hascommoninds(
+    ::typeof(siteinds), A::MPST, B::MPST
+) where {MPST<:ExplicitBondMPS}
     N = nsites(A)
     if nsites(B) != N
         throw(
             DimensionMismatch(
-                "The two VidalMPSs have mismatched number of sites $N and $(nsites(B))."
+                "The two $(typeof(A))s have mismatched number of sites $N and $(nsites(B))."
             ),
         )
     end
@@ -343,7 +360,7 @@ function ITensorMPS.check_hascommoninds(::typeof(siteinds), A::VidalMPS, B::Vida
     for n in 1:N
         if !hascommoninds(siteinds(A, n), siteinds(B, n))
             errmsg =
-                "The two VidalMPSs must share site indices. On site $n, the former " *
+                "The two $(typeof(A))s must share site indices. On site $n, the former " *
                 "has site indices $(siteinds(A, n)) while the latter has site indices " *
                 "$(siteinds(B, n))."
             error(errmsg)
@@ -355,38 +372,44 @@ end
 
 """
     linkdim(ψ::VidalMPS, j::Integer)
+    linkdim(ψ::InverseCanonicalMPS, j::Integer)
 
 Get the dimension of the link or bond connecting the `j`-th site the `j+1`-th site of the
 MPS.
 
 If there is no link Index, return `nothing`.
 """
-function ITensorMPS.linkdim(ψ::VidalMPS, b::Integer)
+function ITensorMPS.linkdim(ψ::ExplicitBondMPS, b::Integer)
     # The b-th site is connected to the b+1-th one by the bond tensor `bond_tensors(ψ)[b]`,
     # that has two indices of the same dimension, obtained by `rightlinkind(ψ, b)` or
     # `leftlinkind(ψ, b+1)`.
     l = rightlinkind(ψ, b)
 
-    isnothing(l) && return nothing
-    return dim(l)
+    return if isnothing(l)
+        nothing
+    else
+        dim(l)
+    end
 end
 
 """
     linkdims(ψ::VidalMPS)
+    linkdims(ψ::InverseCanonicalMPS)
 
 Get the dimension of the links or bonds connecting each site of the MPS with the following
 one.
 """
-ITensorMPS.linkdims(ψ::VidalMPS) = [linkdim(ψ, b) for b in 1:(nsites(ψ) - 1)]
+ITensorMPS.linkdims(ψ::ExplicitBondMPS) = [linkdim(ψ, b) for b in 1:(nsites(ψ) - 1)]
 
 """
     maxlinkdim(ψ::VidalMPS)
+    maxlinkdim(ψ::InverseCanonicalMPS)
 
 Get the maximum link dimension of the MPS.
 
 The minimum this will return is `1`, even if there are no link indices.
 """
-function ITensorMPS.maxlinkdim(ψ::VidalMPS)
+function ITensorMPS.maxlinkdim(ψ::ExplicitBondMPS)
     md = 1
     for b in 1:(nsites(ψ) - 1)
         l = rightlinkind(ψ, b)
