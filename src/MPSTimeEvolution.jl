@@ -28,6 +28,7 @@ struct TEBD end
 include("canonical_mps/definition.jl")
 include("canonical_mps/indices.jl")
 include("canonical_mps/to_mps.jl")
+include("canonical_mps/truncation.jl")
 include("canonical_mps/algebra.jl")
 include("canonical_mps/apply.jl")
 

@@ -420,4 +420,17 @@ end
             norm(v) ≈ inner(v[n], v[n])
         end
     end
+
+    @testset "Truncation" begin
+        s′ = siteinds("Boson", N; dim=6)
+        # We need bigger site indices so that we have more room for truncation.
+        z = random_mps(ComplexF64, s′; linkdims=4)
+        z_ican = convert(InverseCanonicalMPS, z)
+        maxdim = 10
+        cutoff = 1e-8
+        @test truncate(z; maxdim=maxdim, site_range=3:4) ≈
+            convert(MPS, truncate(z_ican; maxdim=maxdim, site_range=3:4))
+        @test truncate(z; cutoff=cutoff) ≈ convert(MPS, truncate(z_ican; cutoff=cutoff))
+        @test truncate(z; maxdim=maxdim) ≈ convert(MPS, truncate(z_ican; maxdim=maxdim))
+    end
 end
