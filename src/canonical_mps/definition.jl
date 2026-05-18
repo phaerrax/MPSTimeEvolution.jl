@@ -354,28 +354,6 @@ function check_vidal_form(ψ::VidalMPS; verbose=true)
     end
 
     # Check whether the cancellation rules hold.
-    #
-    #   Γ[1]───       ╭───
-    #    │            │
-    #    │        =   │
-    #    │            │
-    #   Γ[1]───       ╰───
-
-    M₁ = st[1] * stdag[1]
-    if !isapprox(ITensors.matrix(M₁), I)
-        push!(errors, "left-orthonormality condition not satisfied on site 1")
-    end
-
-    #   ───Γ[N]       ───╮
-    #       │            │
-    #       │     =      │
-    #       │            │
-    #   ───Γ[N]       ───╯
-
-    Mₙ = st[N] * stdag[N]
-    if !isapprox(ITensors.matrix(Mₙ), I)
-        push!(errors, "right-orthonormality condition not satisfied on site $N")
-    end
 
     #   ───Γ[j]───Λ[j]───╮                     ───╮
     #       │            │                        │
@@ -383,9 +361,18 @@ function check_vidal_form(ψ::VidalMPS; verbose=true)
     #       │            │                        │
     #   ───Γ[j]───Λ[j]───╯                     ───╯
 
-    for j in 2:(N - 1)
+    #   ───Γ[N]       ───╮
+    #       │            │
+    #       │     =      │
+    #       │            │
+    #   ───Γ[N]       ───╯
+
+    for j in 2:N
         Mⱼ = st[j] * bt[j] * stdag[j] * btdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, bt[j] * btdag[j]))
+        # Everything works even if j = N: then bt[N] * btdag[N] == ITensor(1.0), and
+        # delta(commoninds(Mⱼ, bt[j] * btdag[j])) becomes a unit tensor, which does nothing
+        # to Mⱼ.
         if !isapprox(ITensors.matrix(Mⱼ), scalar(bt[j] * bt[j]) * I)
             push!(errors, "right-orthonormality condition not satisfied on site $j")
         end
@@ -396,8 +383,14 @@ function check_vidal_form(ψ::VidalMPS; verbose=true)
     #  │             │        =  tr(Λ[j-1]²)  ×   │
     #  │             │                            │
     #  ╰───Λ[j-1]───Γ[j]───                       ╰───
+    #
+    #   Γ[1]───       ╭───
+    #    │            │
+    #    │        =   │
+    #    │            │
+    #   Γ[1]───       ╰───
 
-    for j in 2:(N - 1)
+    for j in 1:(N - 1)
         Mⱼ = bt[j - 1] * st[j] * btdag[j - 1] * stdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, bt[j - 1] * btdag[j - 1]))
         if !isapprox(ITensors.matrix(Mⱼ), scalar(bt[j - 1] * bt[j - 1]) * I)
@@ -439,56 +432,51 @@ function check_inverse_canonical_form(ψ::InverseCanonicalMPS; verbose=true)
     end
 
     # Check whether the cancellation rules hold.
-    #
-    #   C[1]───V[1]───       ╭───
-    #    │                   │
-    #    │               =   │
-    #    │                   │
-    #   C[1]───V[1]───       ╰───
 
-    M₁ = st[1] * stdag[1] * bt[1] * btdag[1]
-    if !isapprox(ITensors.matrix(M₁), I)
-        push!(errors, "left-orthonormality condition not satisfied on site 1")
+    #  ╭───C[j]───V[j]───      ╭───Λ[j-1]───Γ[j]───                       ╭───
+    #  │    │                  │             │                            │
+    #  │    │               =  │             │        =  tr(Λ[j-1]²)  ×   │
+    #  │    │                  │             │                            │
+    #  ╰───C[j]───V[j]───      ╰───Λ[j-1]───Γ[j]───                       ╰───
+
+    #   C[1]───V[1]───       Γ[j]───       ╭───
+    #    │                    │            │
+    #    │               =    │        =   │
+    #    │                    │            │
+    #   C[1]───V[1]───       Γ[j]───       ╰───
+
+    for j in 1:(N - 1)
+        Mⱼ = st[j] * bt[j] * stdag[j] * btdag[j]
+        Mⱼ = Mⱼ * delta(commoninds(Mⱼ, st[j] * stdag[j]))
+        λ = scalar(inv.(bt[j-1]) * inv.(bt[j-1]))
+        if !isapprox(ITensors.matrix(Mⱼ), λ * I)
+            push!(errors, "left-orthonormality condition not satisfied on site $j")
+        end
     end
 
-    #   ───V[N-1]───C[N]       ───╮
-    #                │            │
-    #                │     =      │
-    #                │            │
-    #   ───V[N-1]───C[N]       ───╯
-
-    Mₙ = bt[N - 1] * btdag[N - 1] * st[N] * stdag[N]
+    Mₙ = bt[N - 1] * st[N] * btdag[N - 1] * stdag[N]
     if !isapprox(ITensors.matrix(Mₙ), I)
         push!(errors, "right-orthonormality condition not satisfied on site $N")
     end
 
-    #   ───V[j-1]───C[j]───╮                       ───╮
-    #                │     │                          │
-    #                │     │   =  tr(Λ[j-1]²)  ×      │
-    #                │     │                          │
-    #   ───V[j-1]───C[j]───╯                       ───╯
+    #   ───V[j-1]───C[j]───╮       ───Γ[j]───Λ[j]───╮                     ───╮
+    #                │     │           │            │                        │
+    #                │     │   =       │            │   =  tr(Λ[j]²)  ×      │
+    #                │     │           │            │                        │
+    #   ───V[j-1]───C[j]───╯       ───Γ[j]───Λ[j]───╯                     ───╯
 
-    for j in 2:(N - 1)
+    #   ───V[N-1]───C[N]        ───Γ[N]       ───╮
+    #                │              │            │
+    #                │     =        │     =      │
+    #                │              │            │
+    #   ───V[N-1]───C[N]        ───Γ[N]       ───╯
+
+    for j in 2:N
         Mⱼ = bt[j - 1] * st[j] * btdag[j - 1] * stdag[j]
-        Mⱼ = Mⱼ * delta(commoninds(Mⱼ, st[j] * stdag[j]))
-        λ = scalar(inv.(bt[j - 1]) * inv.(bt[j - 1]))
-        if !isapprox(ITensors.matrix(Mⱼ), λ * I)
-            push!(errors, "right-orthonormality condition not satisfied on site $j")
-        end
-    end
-
-    #  ╭───C[j]───V[j]───                     ╭───
-    #  │    │                                 │
-    #  │    │               =  tr(Λ[j]²)  ×   │
-    #  │    │                                 │
-    #  ╰───C[j]───V[j]───                     ╰───
-
-    for j in 2:(N - 1)
-        Mⱼ = st[j] * bt[j] * stdag[j] * btdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, st[j] * stdag[j]))
         λ = scalar(inv.(bt[j]) * inv.(bt[j]))
         if !isapprox(ITensors.matrix(Mⱼ), λ * I)
-            push!(errors, "left-orthonormality condition not satisfied on site $j")
+            push!(errors, "right-orthonormality condition not satisfied on site $j")
         end
     end
 
