@@ -259,7 +259,7 @@ function Base.show(io::IO, ::MIME"text/plain", ψ::VidalMPS)
     return nothing
 end
 
-function check_vidal_form(ψ::VidalMPS)
+function check_vidal_form(ψ::VidalMPS; verbose=true)
     N = nsites(ψ)
 
     ψdag = sim(linkinds, dag(ψ))
@@ -336,7 +336,7 @@ function check_vidal_form(ψ::VidalMPS)
     if isempty(errors)
         return true
     else
-        foreach(println, errors)
+        verbose && foreach(println, errors)
         return false
     end
 end
