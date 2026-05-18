@@ -206,8 +206,18 @@ end
     end
 
     @testset "Arithmetic operations" begin
-        @test +(x_vidal, y_vidal; alg="densitymatrix") ≈
-            +(x_vidal, y_vidal; alg="directsum")
+        xy_vidal_sum_dm = +(x_vidal, y_vidal; alg="densitymatrix")
+        xy_vidal_sum_ds = +(x_vidal, y_vidal; alg="directsum")
+        # The two sum methods produce equivalent MPSs, in the sense that both are valid
+        # decompositions of the  vector x + y, and will yield the same results when they are
+        # used in functions that fully contract them (as in the ≈ comparison below).
+        # However, the direct-sum method doesn't return a valid Vidal-form MPS, i.e. the
+        # canonical properties are broken, which e.g. `norm` relies upon.
+        @test xy_vidal_sum_dm ≈ xy_vidal_sum_ds
+        @test MPSTimeEvolution.check_vidal_form(xy_vidal_sum_dm)
+        @test MPSTimeEvolution.check_vidal_form(2 * y_vidal)
+        @test_broken MPSTimeEvolution.check_vidal_form(xy_vidal_sum_ds; verbose=false)
+
         @test 2x_vidal ≈ x_vidal + x_vidal
         @test x_vidal + y_vidal - x_vidal ≈ y_vidal
         @test y_vidal / 4 ≈ 0.25 * y_vidal
