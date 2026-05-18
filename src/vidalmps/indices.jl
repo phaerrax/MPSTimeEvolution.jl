@@ -354,10 +354,10 @@ function ITensorMPS.check_hascommoninds(::typeof(siteinds), A::VidalMPS, B::Vida
 end
 
 """
-    linkdim(ψ::MPS, j::Integer)
+    linkdim(ψ::VidalMPS, j::Integer)
 
 Get the dimension of the link or bond connecting the `j`-th site the `j+1`-th site of the
-MPPS.
+MPS.
 
 If there is no link Index, return `nothing`.
 """
@@ -371,7 +371,13 @@ function ITensorMPS.linkdim(ψ::VidalMPS, b::Integer)
     return dim(l)
 end
 
-ITensorMPS.linkdims(ψ::VidalMPS) = [linkdim(ψ, b) for b in 1:(length(ψ) - 1)]
+"""
+    linkdims(ψ::VidalMPS)
+
+Get the dimension of the links or bonds connecting each site of the MPS with the following
+one.
+"""
+ITensorMPS.linkdims(ψ::VidalMPS) = [linkdim(ψ, b) for b in 1:(nsites(ψ) - 1)]
 
 """
     maxlinkdim(ψ::VidalMPS)
