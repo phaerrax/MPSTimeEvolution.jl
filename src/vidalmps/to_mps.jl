@@ -50,6 +50,30 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; cutoff=1e-8)
     # `orthogonalize` would be enough to create a copy of the original MPS, but apparently
     # it is not enough.)
 
+    # I don't really know why, but the MPS needs to be normalised for the conversion
+    # function to produce a correctly canonicalised MPS. Probably it's because once we
+    # extract the bond tensor Λₖ, we also reincorporate it into the site tensor to its right
+    # before we continue the SVD on the next bond, i.e. with
+    #   M = bond_ts[n - 1] * V * ψ[n]
+    # so the norm gets propagated on all bonds.
+    # This (silently) creates all sorts of errors, and most importantly breaks the gauge.
+    # For example, we get
+    #   norm(2v) !≈ norm(convert(VidalMPS, 2v))
+    # while, correctly,
+    #   norm(2v) ≈ norm(2 * convert(VidalMPS, v))
+    # although quite surprisingly we still have
+    #   2 * convert(VidalMPS, v) ≈ convert(VidalMPS, 2v)
+    # which likely signals that the problem lies in the broken canonical gauge, whose
+    # properties are used by the norm function.
+
+    # TODO Maybe we need to rethink the conversion routine? This was taken from Schollwöck,
+    # but he assumes the MPS represents a pure state so he doesn't have to worry about a
+    # norm which is not one.
+    # Anyway, we extract the norm and normalise the MPS, then we'll reintegrate the norm at
+    # the end of the procedure with our `scalarmult` function.
+    norm_ψ = norm(ψ)
+    normalize!(ψ)
+
     # Replace the "l=$n" names in the link indices of the original MPS with something else,
     # in order to avoid an overlap with the "l=$n" tags we want to use for the final MPS.
     for i in eachindex(ψ)
@@ -99,6 +123,8 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; cutoff=1e-8)
     # site_ts[N] = inv.(bond_ts[N-1]) * M = inv.(bond_ts[N-1]) * bond_ts[N-1] * V * ψ[N]
     site_ts[N] = V * ψ[N]
 
-    # Add the trivial bond tensors at the edges of the MPS, and return.
-    return VidalMPS(site_ts, OffsetVector([ITensor(1.0); bond_ts; ITensor(1.0)], 0:N))
+    # Add the trivial bond tensors at the edges of the MPS, put the norm back into the MPS,
+    # and return.
+    return norm_ψ *
+           VidalMPS(site_ts, OffsetVector([ITensor(1.0); bond_ts; ITensor(1.0)], 0:N))
 end
