@@ -96,68 +96,31 @@ end
 
 """
     +(A::VidalMPS...; kwargs...)
-    add(A::VidalMPS...; kwargs...)
+    +(A::InverseCanonicalMPS...; kwargs...)
 
-Add arbitrary numbers of `VidalMPS` with each other, optionally truncating the results.
+    add(A::VidalMPS...; kwargs...)
+    add(A::InverseCanonicalMPS...; kwargs...)
+
+Add arbitrary numbers of (inverse-) canonical MPSs with each other, optionally truncating
+the results.
 
 A cutoff of 1e-15 is used by default, and in general users should set their own cutoff for
 their particular application.
 
-# Keywords
-
-- `cutoff::Real`: singular value truncation cutoff
-- `maxdim::Int`: maximum MPS bond dimension
-- `alg = "densitymatrix"`: `"densitymatrix"` or `"directsum"`. `"densitymatrix"` adds the
-  MPSs by adding up and diagonalizing local density matrices site by site in a single sweep
-  through the system, truncating the density matrix with `cutoff` and `maxdim`.
-  `"directsum"` performs a direct sum of each tensors on each site of the input MPS being
-  summed. It doesn't perform any truncation, and therefore ignores `cutoff` and `maxdim`.
-  The bond dimension of the output is the sum of the bond dimensions of the inputs. You can
-  truncate the resulting MPS with the `truncate!` function.
-
-# Examples
-
-```julia
-N = 10
-s = siteinds("S=1/2", N)
-
-state = n -> isodd(n) ? "↑" : "↓"
-ψ₁ = convert(VidalMPS, random_mps(s, state; linkdims = 2))
-ψ₂ = convert(VidalMPS, random_mps(s, state; linkdims = 2))
-ψ₃ = convert(VidalMPS, random_mps(s, state; linkdims = 2))
-
-ψ = +(ψ₁, ψ₂)
-ψ = ψ₁ + ψ₂
-
-println()
-@show inner(ψ, ψ)
-@show inner(ψ₁, ψ₂) + inner(ψ₁, ψ₂) + inner(ψ₂, ψ₁) + inner(ψ₂, ψ₂)
-
-# Computes ψ₁ + 2ψ₂
-ψ = ψ₁ + 2ψ₂
-
-println()
-@show inner(ψ, ψ)
-@show inner(ψ₁, ψ₁) + 2 * inner(ψ₁, ψ₂) + 2 * inner(ψ₂, ψ₁) + 4 * inner(ψ₂, ψ₂)
-
-# Computes ψ₁ + 2ψ₂ + ψ₃
-ψ = ψ₁ + 2ψ₂ + ψ₃
-
-println()
-@show inner(ψ, ψ)
-@show inner(ψ₁, ψ₁) + 2 * inner(ψ₁, ψ₂) + inner(ψ₁, ψ₃) +
-      2 * inner(ψ₂, ψ₁) + 4 * inner(ψ₂, ψ₂) + 2 * inner(ψ₂, ψ₃) +
-      inner(ψ₃, ψ₁) + 2 * inner(ψ₃, ψ₂) + inner(ψ₃, ψ₃)
-```
+See [`ITensorMPS.add`](@extref) for an explanation of the accepted arguments and some
+examples.
 """
-function Base.:(+)(ψs::VidalMPS...; alg=Algorithm"densitymatrix"(), kwargs...)
+function Base.:(+)(
+    ψs::MPST...; alg=Algorithm"densitymatrix"(), kwargs...
+) where {MPST<:ExplicitBondMPS}
     return +(Algorithm(alg), ψs...; kwargs...)
 end
 
-function Base.:(+)(::Algorithm"directsum", ψs::VidalMPS...)
+function Base.:(+)(::Algorithm"directsum", ψs::MPST...) where {MPST<:ExplicitBondMPS}
     # XXX The direct-sum algorithm, in general, yields an MPS which is not in the Vidal
-    # gauge (because orthonormality rules are not satisfied).
-    # This is something that happens with standard MPSs as well:
+    # gauge (because orthonormality rules are not satisfied). The same likely happens in the
+    # inverse canonical gauge as well.
+    # This is something that already happens at the level of standard MPSs:
     #
     #   julia> N = 10; s = siteinds("S=1/2", N);
     #
@@ -289,60 +252,70 @@ function Base.:(+)(::Algorithm"directsum", ψs::VidalMPS...)
     Γₙ = replaceind(Γₙ, lₙ => dag(prev_link_inds))
     sum_site_ts[n] = Γₙ
 
-    return VidalMPS(
-        sum_site_ts, OffsetVector([ITensor(1.0); sum_bond_ts; ITensor(1.0)], 0:n)
-    )
+    return MPST(sum_site_ts, OffsetVector([ITensor(1.0); sum_bond_ts; ITensor(1.0)], 0:n))
 end
 
-function Base.:(+)(::Algorithm"densitymatrix", ψs::VidalMPS...; cutoff=1e-15, kwargs...)
+function Base.:(+)(
+    ::Algorithm"densitymatrix", ψs::MPST...; cutoff=1e-15, kwargs...
+) where {MPST<:ExplicitBondMPS}
     return convert(
-        VidalMPS,
+        MPST,
         sum([convert(MPS, ψ) for ψ in ψs]; cutoff=cutoff, kwargs...);
         cutoff=cutoff,
         kwargs...,
     )
 end
 
-ITensorMPS.add(ψs::VidalMPS...; kwargs...) = +(ψs...; kwargs...)
+ITensorMPS.add(ψs::ExplicitBondMPS...; kwargs...) = +(ψs...; kwargs...)
 
 function scalarmult!(ψ::VidalMPS, a::Number)
     # Multiplying the MPS by a is equivalent to multiplying one of its tensors by a.
     # However, in order to preserve the Vidal form, the bond tensors must contain
     # non-negative values only, and the site tensors have some orthogonality conditions to
-    # satisfy. Thus, we multiply the last of the bond tensors by |a| and the last site
+    # satisfy. Thus, we multiply the first of the bond tensors by |a| and the first site
     # tensor by exp(i*arg(a)), which means that we multiply the vectors associated to the
-    # singular values (of the last bond tensor) by a unit complex number. This should be
+    # singular values (of the first bond tensor) by a unit complex number. This should be
     # okay.
-    N = nsites(ψ)
     st = site_tensors(ψ)
     bt = bond_tensors(ψ)
-    st[N] *= cis(angle(a))
-    bt[N - 1] *= abs(a)
+    st[1] *= cis(angle(a))
+    bt[2] *= abs(a)
     return ψ
 end
 
-function scalarmult(ψ::VidalMPS, a::Number)
+function scalarmult!(ψ::InverseCanonicalMPS, a::Number)
+    # Still unclear how to do this if a is not a unit complex number, while preserving the
+    # inverse canonical form.
+    if abs(a) ≈ 1
+        site_tensors(ψ)[1] *= a
+    else
+        error("scalar factor multiplying the MPS does not have unit absolute value.")
+    end
+    return ψ
+end
+
+function scalarmult(ψ::ExplicitBondMPS, a::Number)
     return scalarmult!(copy(ψ), a)
 end
 
-Base.:(*)(ψ::VidalMPS, a::Number) = scalarmult(ψ, a)
-Base.:(*)(a::Number, ψ::VidalMPS) = scalarmult(ψ, a)
+Base.:(*)(ψ::ExplicitBondMPS, a::Number) = scalarmult(ψ, a)
+Base.:(*)(a::Number, ψ::ExplicitBondMPS) = scalarmult(ψ, a)
 
-Base.:(+)(ψ::VidalMPS) = ψ
+Base.:(+)(ψ::ExplicitBondMPS) = ψ
 
-Base.:(-)(ψ::VidalMPS) = scalarmult(ψ, -1)
-Base.:(-)(ψ::VidalMPS, ϕ::VidalMPS) = +(ψ, -ϕ)
+Base.:(-)(ψ::ExplicitBondMPS) = scalarmult(ψ, -1)
+Base.:(-)(ψ::MPST, ϕ::MPST) where {MPST<:ExplicitBondMPS} = +(ψ, -ϕ)
 
-Base.:(/)(ψ::VidalMPS, a::Number) = scalarmult(ψ, inv(a))
+Base.:(/)(ψ::ExplicitBondMPS, a::Number) = scalarmult(ψ, inv(a))
 
 function Base.isapprox(
-    x::VidalMPS,
-    y::VidalMPS;
+    x::MPST,
+    y::MPST;
     atol::Real=0,
     rtol::Real=Base.rtoldefault(
         LinearAlgebra.promote_leaf_eltypes(x), LinearAlgebra.promote_leaf_eltypes(y), atol
     ),
-)
+) where {MPST<:ExplicitBondMPS}
     d = norm(x - y)
     if isfinite(d)
         return d <= max(atol, rtol * max(norm(x), norm(y)))
