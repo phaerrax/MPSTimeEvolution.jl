@@ -1,7 +1,11 @@
 using Test, Documenter, MPSTimeEvolution
 using LinearAlgebra, ITensors, ITensorMPS, Observers, CSV, LindbladVectorizedTensors
 
-using MPSTimeEvolution: _sf_translate_sites, _sf_translate_sites_inv, check_vidal_form
+using MPSTimeEvolution:
+    _sf_translate_sites,
+    _sf_translate_sites_inv,
+    check_vidal_form,
+    check_inverse_canonical_form
 
 include("testset_skip.jl")
 
@@ -436,6 +440,26 @@ end
 
     y = random_mps(ComplexF64, s; linkdims=4)
     y_ican = convert(InverseCanonicalMPS, y)
+    @testset "Arithmetic operations" begin
+        @test x_ican + y_ican - x_ican ≈ y_ican
+
+        xy_ican_sum_dm = +(x_ican, y_ican; alg="densitymatrix")
+        xy_ican_sum_ds = +(x_ican, y_ican; alg="directsum")
+        @test xy_ican_sum_dm ≈ xy_ican_sum_ds
+        @test check_inverse_canonical_form(xy_ican_sum_dm)
+
+        @test_broken check_inverse_canonical_form(xy_ican_sum_ds; verbose=false)
+        @test check_inverse_canonical_form(canonicalize(xy_ican_sum_ds))
+
+        yy_ican = deepcopy(y_ican)
+        yy_ican.site_tensors[2] *= 2
+        # We cannot multiply `y_ican` by two directly (it is not allowed by the * operation)
+        # but we can do what we want with the individual tensors. This should break the IC
+        # gauge.
+        @test_broken check_inverse_canonical_form(yy_ican; verbose=false)
+        @test check_inverse_canonical_form(canonicalize(yy_ican))
+    end
+
     @testset "Inner product and norm" begin
         @test dot(x_ican, y_ican) ≈ conj(dot(y_ican, x_ican))
         @test dot(x_ican, y_ican) ≈ dot(x, y)

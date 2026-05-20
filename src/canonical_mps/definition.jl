@@ -448,7 +448,7 @@ function check_inverse_canonical_form(ψ::InverseCanonicalMPS; verbose=true)
     for j in 1:(N - 1)
         Mⱼ = st[j] * bt[j] * stdag[j] * btdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, st[j] * stdag[j]))
-        λ = scalar(inv.(bt[j-1]) * inv.(bt[j-1]))
+        λ = scalar(inv.(bt[j - 1]) * inv.(bt[j - 1]))
         if !isapprox(ITensors.matrix(Mⱼ), λ * I)
             push!(errors, "left-orthonormality condition not satisfied on site $j")
         end
@@ -490,6 +490,7 @@ end
 
 """
     canonicalize(ψ::VidalMPS; kwargs...)
+    canonicalize(ψ::InverseCanonicalMPS; kwargs...)
 
 Return a `VidalMPS` which is equivalent to `ψ` and satisfies the canonical gauge conditions,
 whether `ψ` satisfies them or not.
@@ -497,9 +498,11 @@ whether `ψ` satisfies them or not.
 The process involves a sequence of singular-value decompositions, to which a `cutoff`
 keyword argument can be forwarded.
 """
-function canonicalize(ψ::VidalMPS; kwargs...)
+function canonicalize(ψ::MPST; kwargs...) where {MPST<:ExplicitBondMPS}
     # See the comments in the `+(::Algorithm"directsum", ψs::VidalMPS...)` method to
     # understand this choice.
+    # Here we orthogonalise the middle MPS on the last site, but I think we can choose
+    # whatever site we like...
+    return convert(MPST, orthogonalize(convert(MPS, ψ), nsites(ψ)); kwargs...)
     # TODO is there a way to do this without passing through an ordinary MPS?
-    return convert(VidalMPS, orthogonalize(convert(MPS, ψ), nsites(ψ)); kwargs...)
 end
