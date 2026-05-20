@@ -1,7 +1,7 @@
 using Test, Documenter, MPSTimeEvolution
 using LinearAlgebra, ITensors, ITensorMPS, Observers, CSV, LindbladVectorizedTensors
 
-using MPSTimeEvolution: _sf_translate_sites, _sf_translate_sites_inv
+using MPSTimeEvolution: _sf_translate_sites, _sf_translate_sites_inv, check_vidal_form
 
 include("testset_skip.jl")
 
@@ -210,14 +210,16 @@ end
         xy_vidal_sum_ds = +(x_vidal, y_vidal; alg="directsum")
         # The two sum methods produce equivalent MPSs, in the sense that both are valid
         # decompositions of the  vector x + y, and will yield the same results when they are
-        # used in functions that fully contract them (as in the ≈ comparison below).
+        # used in functions that fully contract them.
         # However, the direct-sum method doesn't return a valid Vidal-form MPS, i.e. the
         # canonical properties are broken, which e.g. `norm` relies upon.
         @test xy_vidal_sum_dm ≈ xy_vidal_sum_ds
-        @test MPSTimeEvolution.check_vidal_form(xy_vidal_sum_dm)
-        @test MPSTimeEvolution.check_vidal_form(2 * y_vidal)
-        @test_broken MPSTimeEvolution.check_vidal_form(xy_vidal_sum_ds; verbose=false)
+        @test check_vidal_form(xy_vidal_sum_dm)
+        @test check_vidal_form(2 * y_vidal)
+        @test_broken check_vidal_form(xy_vidal_sum_ds; verbose=false)
+        @test check_vidal_form(canonicalize(xy_vidal_sum_ds))  # This shoud work
 
+        # Here we use the default density-matrix approach for the sum, so everything's okay.
         @test 2x_vidal ≈ x_vidal + x_vidal
         @test x_vidal + y_vidal - x_vidal ≈ y_vidal
         @test y_vidal / 4 ≈ 0.25 * y_vidal
@@ -237,29 +239,29 @@ end
 
     @testset "Application of one-site unitary operators" begin
         a = op("RandomUnitary", s, 1)
-        @test MPSTimeEvolution.check_vidal_form(apply(a, x_vidal))
+        @test check_vidal_form(apply(a, x_vidal))
         @test convert(MPS, apply(a, x_vidal)) ≈ apply(a, x)
 
         b = op("RandomUnitary", s, 3)
-        @test MPSTimeEvolution.check_vidal_form(apply(b, x_vidal))
+        @test check_vidal_form(apply(b, x_vidal))
         @test convert(MPS, apply(b, x_vidal)) ≈ apply(b, x)
 
         c = op("RandomUnitary", s, N)
-        @test MPSTimeEvolution.check_vidal_form(apply(c, x_vidal))
+        @test check_vidal_form(apply(c, x_vidal))
         @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
     end
 
     @testset "Application of two-site unitary operators" begin
         a = op("RandomUnitary", s, 1, 2)
-        @test MPSTimeEvolution.check_vidal_form(apply(a, x_vidal))
+        @test check_vidal_form(apply(a, x_vidal))
         @test convert(MPS, apply(a, x_vidal)) ≈ apply(a, x)
 
         b = op("RandomUnitary", s, 2, 3)
-        @test MPSTimeEvolution.check_vidal_form(apply(b, x_vidal))
+        @test check_vidal_form(apply(b, x_vidal))
         @test convert(MPS, apply(b, x_vidal)) ≈ apply(b, x)
 
         c = op("RandomUnitary", s, N-1, N)
-        @test MPSTimeEvolution.check_vidal_form(apply(c, x_vidal))
+        @test check_vidal_form(apply(c, x_vidal))
         @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
 
         d = op("RandomUnitary", s, 2, 4)
@@ -270,15 +272,15 @@ end
 
     @testset "Application of three-site unitary operators" begin
         a = op("RandomUnitary", s, 1, 2, 3)
-        @test MPSTimeEvolution.check_vidal_form(apply(a, x_vidal))
+        @test check_vidal_form(apply(a, x_vidal))
         @test convert(MPS, apply(a, x_vidal)) ≈ apply(a, x)
 
         b = op("RandomUnitary", s, 2, 3, 4)
-        @test MPSTimeEvolution.check_vidal_form(apply(b, x_vidal))
+        @test check_vidal_form(apply(b, x_vidal))
         @test convert(MPS, apply(b, x_vidal)) ≈ apply(b, x)
 
         c = op("RandomUnitary", s, N-2, N-1, N)
-        @test MPSTimeEvolution.check_vidal_form(apply(c, x_vidal))
+        @test check_vidal_form(apply(c, x_vidal))
         @test convert(MPS, apply(c, x_vidal)) ≈ apply(c, x)
     end
 

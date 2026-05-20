@@ -252,6 +252,61 @@ function Base.:(+)(ψs::VidalMPS...; alg=Algorithm"densitymatrix"(), kwargs...)
 end
 
 function Base.:(+)(::Algorithm"directsum", ψs::VidalMPS...)
+    # XXX The direct-sum algorithm, in general, yields an MPS which is not in the Vidal
+    # gauge (because orthonormality rules are not satisfied).
+    # This is something that happens with standard MPSs as well:
+    #
+    #   julia> N = 10; s = siteinds("S=1/2", N);
+    #
+    #   julia> v = random_mps(ComplexF64, s; linkdims=2);
+    #
+    #   julia> w = random_mps(ComplexF64, s; linkdims=5);
+    #
+    #   julia> z = +(v, w; alg="directsum");
+    #
+    #   julia> function right_ortho_check(z)
+    #              zdag = sim(linkinds, dag(z))
+    #              rchecks = [
+    #                  matrix(
+    #                      z[j] * zdag[j]
+    #                      * delta(commoninds(z[j] * zdag[j], z[j+1] * zdag[j+1]))
+    #                  ) ≈ I
+    #                  for j in 2:N-1
+    #              ]
+    #              return [rchecks; matrix(z[end] * zdag[end]) ≈ I]
+    #          end
+    #
+    #   julia> all(right_ortho_check(z))
+    #   false
+    #
+    # so this is a well-known “issue”. As a matter of fact, ITensor sets the orthonormality
+    # limits (i.e. the sites delimiting the position of the orthocentre) of the MPS returned
+    # from the direct sum to 1 and N, that practically means that none of the tensors are
+    # left- or right-orthonormal.  The other MPS functions in the library read these
+    # orthonormality limits and know that they cannot simplify the contractions using the
+    # cancellation rules.
+    #
+    #   julia> orthocenter(z)
+    #   ERROR: MPS has no well-defined orthogonality center, orthogonality center is on the
+    #       range 1:10.
+    #
+    # However, check this:
+    #
+    #   julia> zz = +(convert(VidalMPS, v), convert(VidalMPS, w); alg="directsum");
+    #
+    #   julia> MPSTimeEvolution.check_vidal_form(convert(VidalMPS, zz); verbose=false)
+    #   false
+    #
+    # ...but
+    #
+    #   julia> zo = orthogonalize(z, 1);
+    #
+    #   julia> MPSTimeEvolution.check_vidal_form(convert(VidalMPS, zo); verbose=false)
+    #   true
+    #
+    # This tells us that there's a way to restore the Vidal gauge, by repeating the same
+    # steps as in the `orthogonalize` function. (See the `canonicalize` function.)
+
     @assert allequal(nsites, ψs)
     n = nsites(first(ψs))
 

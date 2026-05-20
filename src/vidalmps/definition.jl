@@ -1,4 +1,4 @@
-export VidalMPS
+export VidalMPS, canonicalize
 
 mutable struct VidalMPS
     #        │       │       │         │       │       │
@@ -339,4 +339,20 @@ function check_vidal_form(ψ::VidalMPS; verbose=true)
         verbose && foreach(println, errors)
         return false
     end
+end
+
+"""
+    canonicalize(ψ::VidalMPS; kwargs...)
+
+Return a `VidalMPS` which is equivalent to `ψ` and satisfies the canonical gauge conditions,
+whether `ψ` satisfies them or not.
+
+The process involves a sequence of singular-value decompositions, to which a `cutoff`
+keyword argument can be forwarded.
+"""
+function canonicalize(ψ::VidalMPS; kwargs...)
+    # See the comments in the `+(::Algorithm"directsum", ψs::VidalMPS...)` method to
+    # understand this choice.
+    # TODO is there a way to do this without passing through an ordinary MPS?
+    return convert(VidalMPS, orthogonalize(convert(MPS, ψ), nsites(ψ)); kwargs...)
 end

@@ -162,6 +162,18 @@ julia> +(vv, ww; alg="densitymatrix");
 
 ```
 
+!!! warning "Restoring the canonical gauge"
+    The result of the direct-sum addition algorithm, in general, doesn't satisfy
+    the canonical gauge, i.e. \eqref{eq:vidalmps_cancellation_rules} don't hold
+    anymore.  You can check whether a `VidalMPS` object `v` satisfies
+    \eqref{eq:vidalmps_cancellation_rules}, and therefore is _actually_ a
+    Vidal-form MPS, with the (internal) `check_vidal_form` function.
+    If the MPS doesn't satisfy the requirements of the Vidal form, its behaviour
+    in several functions (which assume the cancellation rules hold) becomes
+    undefined, and may lead to wrong results, e.g. `norm(v)^2` may not equal to
+    `inner(v, v)`.  In such cases, the canonical gauge can be restored by
+    calling the `canonicalize` function on the offending `VidalMPS` object.
+
 ### Bond dimension truncation
 
 The Vidal-form MPS can be compressed at a specified bond \\(k\\) by deleting the
