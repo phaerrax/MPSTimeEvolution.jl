@@ -433,4 +433,17 @@ end
         @test truncate(z; cutoff=cutoff) ≈ convert(MPS, truncate(z_ican; cutoff=cutoff))
         @test truncate(z; maxdim=maxdim) ≈ convert(MPS, truncate(z_ican; maxdim=maxdim))
     end
+
+    y = random_mps(ComplexF64, s; linkdims=4)
+    y_ican = convert(InverseCanonicalMPS, y)
+    @testset "Inner product and norm" begin
+        @test dot(x_ican, y_ican) ≈ conj(dot(y_ican, x_ican))
+        @test dot(x_ican, y_ican) ≈ dot(x, y)
+        @test norm(x_ican) ≈ norm(x)
+        @test norm(-x_ican) ≈ norm(x_ican)
+
+        λ = cis(rand())
+        @test dot(λ * x_ican, y_ican) ≈ conj(λ) * dot(x_ican, y_ican)
+        @test dot(x_ican, x_ican - y_ican) ≈ dot(x_ican, x_ican) - dot(x_ican, y_ican)
+    end
 end

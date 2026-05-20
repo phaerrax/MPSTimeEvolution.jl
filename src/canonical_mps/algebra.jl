@@ -4,21 +4,23 @@ using NDTensors.BackendSelection: @Algorithm_str, Algorithm
 
 """
     inner(A::VidalMPS, B::VidalMPS)
+    inner(A::InverseCanonicalMPS, B::InverseCanonicalMPS)
 
 Compute the inner product `⟨A,B⟩`.
 
 Same as [`dot`](@ref).
 """
-ITensorMPS.inner(ψ1::VidalMPS, ψ2::VidalMPS) = dot(ψ1, ψ2)
+ITensorMPS.inner(ψ1::MPST, ψ2::MPST) where {MPST<:ExplicitBondMPS} = dot(ψ1, ψ2)
 
 """
     dot(A::VidalMPS, B::VidalMPS)
+    dot(A::InverseCanonicalMPS, B::InverseCanonicalMPS)
 
 Compute the inner product `⟨A,B⟩`.
 
 Same as [`inner`](@ref).
 """
-function LinearAlgebra.dot(ψ1::VidalMPS, ψ2::VidalMPS)::Number
+function LinearAlgebra.dot(ψ1::MPST, ψ2::MPST)::Number where {MPST<:ExplicitBondMPS}
     N = nsites(ψ1)
     if nsites(ψ2) != N
         throw(DimensionMismatch("inner: mismatched number of sites $N and $(nsites(ψ2))"))
@@ -54,18 +56,30 @@ function LinearAlgebra.dot(ψ1::VidalMPS, ψ2::VidalMPS)::Number
     return dot_ψ1_ψ2
 end
 
-"""
-    norm(A::VidalMPS)
+function _simplified_norm_contraction(ψ::VidalMPS)
+    contr_post = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[2:end]; init=1.0)
+    return contr_post * norm(site_tensors(ψ)[1] * bond_tensors(ψ)[1])
+end
 
-Compute the norm of the `VidalMPS`.
+function _simplified_norm_contraction(ψ::InverseCanonicalMPS)
+    contr_post = prod(scalar(inv.(V) * inv.(V)) for V in bond_tensors(ψ); init=1.0)
+    return contr_post * norm(site_tensors(ψ)[1])
+end
+
 """
-function LinearAlgebra.norm(ψ::VidalMPS; neg_atol=eps(real(NDTensors.scalartype(ψ))) * 10)
+    norm(ψ::VidalMPS)
+    norm(ψ::InverseCanonicalMPS)
+
+Compute the norm of the MPS, assuming that it satisfies the (inverse-) canonical gauge
+conditions.
+"""
+function LinearAlgebra.norm(
+    ψ::ExplicitBondMPS; neg_atol=eps(real(NDTensors.scalartype(ψ))) * 10
+)
     rtol = eps(real(NDTensors.scalartype(ψ))) * 10
     atol = rtol
 
-    M₁ = site_tensors(ψ)[1] * bond_tensors(ψ)[1]
-    contr_post = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[2:end]; init=1.0)
-    norm2_ψ = contr_post * inner(M₁, M₁)
+    norm2_ψ = _simplified_norm_contraction(ψ)
 
     if !IsApprox.isreal(norm2_ψ, IsApprox.Approx(; rtol=rtol, atol=atol))
         @warn "norm² is $norm2_ψ, which is not real up to a relative tolerance of " *
