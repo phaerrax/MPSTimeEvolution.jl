@@ -334,6 +334,12 @@ function Base.isapprox(
     if isfinite(d)
         return d <= max(atol, rtol * max(norm(x), norm(y)))
     else
-        error("In `isapprox(x::VidalMPS, y::VidalMPS)`, `norm(x - y)` is not finite")
+        error(
+            "In `isapprox(x::",
+            typeof(x),
+            "y::",
+            typeof(y),
+            "`, `norm(x - y)` is not finite",
+        )
     end
 end

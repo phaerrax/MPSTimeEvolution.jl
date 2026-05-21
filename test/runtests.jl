@@ -470,4 +470,61 @@ end
         @test dot(λ * x_ican, y_ican) ≈ conj(λ) * dot(x_ican, y_ican)
         @test dot(x_ican, x_ican - y_ican) ≈ dot(x_ican, x_ican) - dot(x_ican, y_ican)
     end
+
+    @testset "Application of one-site unitary operators" begin
+        a = op("RandomUnitary", s, 1)
+        @test check_inverse_canonical_form(apply(a, x_ican))
+        @test convert(MPS, apply(a, x_ican)) ≈ apply(a, x)
+
+        b = op("RandomUnitary", s, 3)
+        @test check_inverse_canonical_form(apply(b, x_ican))
+        @test convert(MPS, apply(b, x_ican)) ≈ apply(b, x)
+
+        c = op("RandomUnitary", s, N)
+        @test check_inverse_canonical_form(apply(c, x_ican))
+        @test convert(MPS, apply(c, x_ican)) ≈ apply(c, x)
+    end
+
+    @testset "Application of two-site unitary operators" begin
+        a = op("RandomUnitary", s, 1, 2)
+        @test check_inverse_canonical_form(apply(a, x_ican))
+        @test convert(MPS, apply(a, x_ican)) ≈ apply(a, x)
+
+        b = op("RandomUnitary", s, 2, 3)
+        @test check_inverse_canonical_form(apply(b, x_ican))
+        @test convert(MPS, apply(b, x_ican)) ≈ apply(b, x)
+
+        c = op("RandomUnitary", s, N-1, N)
+        @test check_inverse_canonical_form(apply(c, x_ican))
+        @test convert(MPS, apply(c, x_ican)) ≈ apply(c, x)
+
+        d = op("RandomUnitary", s, 2, 4)
+        # The tensor indices are not contiguous site indices. The apply function should
+        # throw an error in this case.
+        @test_throws ErrorException apply(d, x_ican)
+    end
+
+    @testset "Application of three-site unitary operators" begin
+        a = op("RandomUnitary", s, 1, 2, 3)
+        @test check_inverse_canonical_form(apply(a, x_ican))
+        @test convert(MPS, apply(a, x_ican)) ≈ apply(a, x)
+
+        b = op("RandomUnitary", s, 2, 3, 4)
+        @test check_inverse_canonical_form(apply(b, x_ican))
+        @test convert(MPS, apply(b, x_ican)) ≈ apply(b, x)
+
+        c = op("RandomUnitary", s, N-2, N-1, N)
+        @test check_inverse_canonical_form(apply(c, x_ican))
+        @test convert(MPS, apply(c, x_ican)) ≈ apply(c, x)
+    end
+
+    @testset "Expectation values" begin
+        @test expect(x, "S²") ≈ expect(x_ican, "S²")
+
+        m = [1 im; 1+1im 0]
+        @test expect(x, m) ≈ expect(x_ican, m)
+
+        @test expect(y, "ProjDn"; sites=3:N) ≈ expect(y_ican, "ProjDn"; sites=3:N)
+        @test expect(x, ["Sx", "Sy", "Sz"]) ≈ expect(x_ican, ["Sx", "Sy", "Sz"])
+    end
 end
