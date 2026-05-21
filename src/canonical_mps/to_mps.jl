@@ -169,18 +169,75 @@ function Base.convert(::Type{InverseCanonicalMPS}, ψ::MPS; cutoff=1e-8)
     return convert(InverseCanonicalMPS, convert(VidalMPS, ψ; cutoff=cutoff))
 end
 
-# VidalMPS to InverseCanonicalMPS: Vₖ = Λₖ⁻¹, and
-#   Cₖ = Λₖ⁻¹ Γₖ Λₖ,
-#   C₁ = Γ₁ Λ₁,
-#   Cₙ = Λₙ₋₁Γₙ.
-# With the trivial bond tensors Λ₀ = Λₙ = 1, the first equation holds for all k.
 function Base.convert(::Type{InverseCanonicalMPS}, ψ::VidalMPS)
     N = nsites(ψ)
     Γ = site_tensors(ψ)
     Λ = bond_tensors(ψ)
 
+    # VidalMPS to InverseCanonicalMPS: Vₖ = Λₖ⁻¹, and
+    #   Cₖ = Λₖ⁻¹ Γₖ Λₖ,
+    #   C₁ = Γ₁ Λ₁,
+    #   Cₙ = Λₙ₋₁Γₙ.
+    #
+    #        │       │       │         │       │       │
+    #    ◇···▧───◆───▧───◆───▧─╶╶  ╶╶╶─▧───◆───▧───◆───▧···◇
+    #       C[1]    C[2]    C[3]      C[N-2]  C[N-1]  C[N]
+    #   V[0]    V[1]    V[2]             V[N-2]  V[N-1]   V[N]
+    #
+    # (With the trivial bond tensors Λ₀ = Λₙ = 1, the first equation holds for all k.)
+
     ic_site_ts = [Λ[n - 1] * Γ[n] * Λ[n] for n in 1:N]
-    ic_bond_ts = [inv.(Λⱼ) for Λⱼ in Λ]
+    ic_bond_ts = [inv.(Λⱼ) for Λⱼ in Λ]  # This includes the trivial bond tensors.
+
+    # However, just using the formulas above doesn't work, because the link indices become
+    # messed up:
+    #
+    #   ((dim=2|id=#|"S=1/2,Site,n=1"), (dim=2|id=#|"Link,l=2"))
+    #   ((dim=2|id=#|"Link,r=1"), (dim=2|id=#|"Link,l=2"))
+    #   ((dim=2|id=#|"Link,r=1"), (dim=2|id=#|"S=1/2,Site,n=2"), (dim=2|id=#|"Link,l=3"))
+    #   ((dim=2|id=#|"Link,r=2"), (dim=2|id=#|"Link,l=3"))
+    #
+    # while for example the first site tensor should have a link index with tags "r=1".
+    # This breaks the index structure so that functions such as `apply` do not work as
+    # expected.
+    # (The order in the bond tensors doesn't really matter since they are symmetric.)
+    # We have to restore the standard tags structure of an InverseCanonicalMPS.
+
+    old_rlink_inds = [commonind(ic_site_ts[n], ic_bond_ts[n]) for n in 1:(N - 1)]
+    old_llink_inds = [commonind(ic_bond_ts[n], ic_site_ts[n + 1]) for n in 1:(N - 1)]
+
+    new_rlink_inds = [Index(dim(old_rlink_inds[n]); tags="Link,r=$n") for n in 1:(N - 1)]
+    new_llink_inds = [
+        Index(dim(old_llink_inds[n]); tags="Link,l=$(n+1)") for n in 1:(N - 1)
+    ]
+
+    for n in 1:(N - 1)
+        ic_site_ts[n] *= delta(old_rlink_inds[n], new_rlink_inds[n])
+    end
+
+    for n in 1:(N - 1)
+        # Beware: we need to do these index manipulations without changing the type of
+        # the bond tensors from NDTensors.Diag to NDTensors.Dense, otherwise when we call
+        # `inv.` on the bond tensors we get `Inf`s everywhere.
+        # The `delta` tensor is NDTensors.Diag, but the product of two delta tensors isn't,
+        # thus we apparently need to perform the multiplication in two steps.
+        # Unfortunately, contracting a diagonal tensor with a delta tensor returns an error
+        # message saying "Not implemented", which I guess tells us that this kind of
+        # operation is not possible in ITensor (yet?).
+        # So, as a workaround, we do create a non-diagonal tensor first, by multiplying the
+        # deltas together and then with the bond tensor; then, we turn it into a diagonal
+        # tensor with the syntax `diag_itensor(vector(diag(t)), inds(t)...)`
+        Vₙ =
+            ic_bond_ts[n] * (
+                delta(old_rlink_inds[n], new_rlink_inds[n]) *
+                delta(old_llink_inds[n], new_llink_inds[n])
+            )
+        ic_bond_ts[n] = diag_itensor(vector(diag(Vₙ)), inds(Vₙ)...)
+    end
+
+    for n in 2:N
+        ic_site_ts[n] *= delta(old_llink_inds[n - 1], new_llink_inds[n - 1])
+    end
 
     return InverseCanonicalMPS(ic_site_ts, ic_bond_ts)
 end
