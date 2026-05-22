@@ -239,6 +239,8 @@ end
         @test dot(λ * x_vidal, y_vidal) ≈ conj(λ) * dot(x_vidal, y_vidal)
         @test dot(x_vidal, x_vidal - y_vidal) ≈
             dot(x_vidal, x_vidal) - dot(x_vidal, y_vidal)
+
+        @test norm(normalize(convert(InverseCanonicalMPS, 2x))) ≈ 1
     end
 
     @testset "Application of one-site unitary operators" begin
@@ -469,6 +471,8 @@ end
         λ = cis(rand())
         @test dot(λ * x_ican, y_ican) ≈ conj(λ) * dot(x_ican, y_ican)
         @test dot(x_ican, x_ican - y_ican) ≈ dot(x_ican, x_ican) - dot(x_ican, y_ican)
+
+        @test norm(normalize(convert(InverseCanonicalMPS, 2x))) ≈ 1
     end
 
     @testset "Application of one-site unitary operators" begin

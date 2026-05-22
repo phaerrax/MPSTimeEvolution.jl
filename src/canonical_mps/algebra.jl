@@ -46,11 +46,7 @@ function LinearAlgebra.dot(ψ1::MPST, ψ2::MPST)::Number where {MPST<:ExplicitBo
     dot_ψ1_ψ2 = scalar(x)
 
     if !isfinite(dot_ψ1_ψ2)
-        @warn "The inner product (or norm²) you are computing is very large " *
-            "($dot_ψ1_ψ2). You should consider using `lognorm` or `loginner` instead, " *
-            "which will help avoid floating point errors. For example if you are trying " *
-            "to normalize your MPS/MPO `A`, the normalized MPS/MPO `B` would be given by " *
-            "`B = A ./ z` where `z = exp(lognorm(A) / length(A))`."
+        @warn "The inner product (or norm²) you are computing is very large ($dot_ψ1_ψ2)."
     end
 
     return dot_ψ1_ψ2
@@ -343,3 +339,43 @@ function Base.isapprox(
         )
     end
 end
+
+"""
+    normalize!(ψ::VidalMPS)
+
+Change the MPS `ψ` in-place such that `norm(ψ) ≈ 1`. This modifies the data of the bond
+tensors of the MPS.
+
+In practice, this renormalises the singular values in each bond tensor so that the sum of
+their squares is 1.
+
+If the norm of the input MPS is 0, normalizing is ill-defined. In this case, we just return
+the original MPS.
+"""
+function LinearAlgebra.normalize!(ψ::VidalMPS)
+    if iszero(norm(ψ))
+        return ψ
+    end
+    for n in 1:(nsites(ψ) - 1)
+        bond_tensors(ψ)[n] /= sqrt(scalar(bond_tensors(ψ)[n] * bond_tensors(ψ)[n]))
+    end
+    return ψ
+end
+
+function LinearAlgebra.normalize!(ψ::InverseCanonicalMPS)
+    if iszero(norm(ψ))
+        return ψ
+    end
+    for n in 1:(nsites(ψ) - 1)
+        # A VidalMPS is renormalised by performing the substitution
+        #   Λⱼ ← 1/√tr(Λⱼ²) * Λⱼ;
+        # replacing Λⱼ by Vⱼ⁻¹ we obtain
+        #   Vⱼ ← √tr((Vⱼ⁻¹)²) * Vⱼ
+        bond_tensors(ψ)[n] *= sqrt(
+            scalar(inv.(bond_tensors(ψ)[n]) * inv.(bond_tensors(ψ)[n]))
+        )
+    end
+    return ψ
+end
+
+LinearAlgebra.normalize(ψ::ExplicitBondMPS) = normalize!(copy(ψ))
