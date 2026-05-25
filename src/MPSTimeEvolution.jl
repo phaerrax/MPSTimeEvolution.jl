@@ -31,6 +31,7 @@ include("canonical_mps/to_mps.jl")
 include("canonical_mps/truncation.jl")
 include("canonical_mps/algebra.jl")
 include("canonical_mps/apply.jl")
+include("canonical_mps/projmpo.jl")
 
 include("itensor.jl")
 include("callback.jl")

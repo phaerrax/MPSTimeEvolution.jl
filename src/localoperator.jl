@@ -174,8 +174,8 @@ end
 # collection has more than one element).
 LocalOperator(s::AbstractString) = only(parseoperators(s))
 
-function ITensorMPS.expect(ψ::VidalMPS, lop::LocalOperator)
-    # Adapted from the main `expect(::VidalMPS, ...)` method.
+function ITensorMPS.expect(ψ::ExplicitBondMPS, lop::LocalOperator)
+    # Adapted from the main `expect(::ExplicitBondMPS, ...)` method.
     ψ = copy(ψ)
     ElT = NDTensors.scalartype(ψ)
     s = siteinds(ψ)

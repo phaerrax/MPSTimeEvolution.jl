@@ -467,3 +467,74 @@ function compute_norm!(cb::ExpValueCallback, ψ::VidalMPS, alg::TEBD; current_ti
 
     return nothing
 end
+
+### Methods for InverseCanonicalMPS
+
+function compute_norm!(
+    cb::ExpValueCallback, state::InverseCanonicalMPS, alg::TDVP; current_time
+)
+    if isempty(measurement_ts(cb))
+        prev_t = 0
+    else
+        prev_t = measurement_ts(cb)[end]
+    end
+
+    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
+        push!(measurements_norm(cb), norm(state))
+    end
+
+    return nothing
+end
+
+function measure_localops!(cb::ExpValueCallback, state::InverseCanonicalMPS, alg::TDVP)
+    # In the inverse-canonical gauge, measurements can be performed in parallel, as we don't
+    # need to reorthogonalise the MPS each time.
+    Threads.@threads :greedy for localop in ops(cb)
+        measurements(cb)[localop][end] = expect(state, localop)
+        # `measurements(cb)[localop][end]` is the last line in the measurements of `localop`
+        # which we (must) have created in `apply!` before calling this function.
+    end
+
+    return nothing
+end
+
+function apply!(
+    cb::ExpValueCallback, state::InverseCanonicalMPS, alg::TDVP; current_time, kwargs...
+)
+    # TODO can we merge this method with `apply!` for ordinary MPSs? Here we accept fewer
+    # keyword arguments, but maybe there's a way to use a single function.
+    if isempty(measurement_ts(cb))
+        # Initialize `cb` here.
+        @debug "No measurements found (t = $current_time). Initialising callback object."
+        prev_t = 0.0
+        push!(measurement_ts(cb), current_time)
+        foreach(values(measurements(cb))) do v
+            push!(v, zero(eltype(v)))
+        end
+        #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+    else
+        prev_t = measurement_ts(cb)[end]
+        @debug "Found previous measurements (t = $current_time, prev_t = $prev_t)."
+    end
+
+    # We perform measurements only at the end of a sweep and at measurement steps.
+    # For TDVP we can perform measurements to the right of each site when sweeping back
+    # left.
+    if (current_time - prev_t ≈ callback_dt(cb) || current_time == prev_t)
+        if current_time != prev_t
+            @debug "Adding t = $current_time to the list of time instants of the callback."
+            # Add the current time to the list of time instants at which we measured
+            # something.
+            push!(measurement_ts(cb), current_time)
+            # Create a new slot in which we will put the measurement result.
+            foreach(values(measurements(cb))) do v
+                push!(v, zero(eltype(v)))
+            end
+        end
+        #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+        @debug "Computing expectation values on all sites at t = $current_time (prev_t = $prev_t)"
+        measure_localops!(cb, state, alg)
+    end
+
+    return nothing
+end

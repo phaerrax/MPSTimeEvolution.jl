@@ -105,7 +105,7 @@ include("compare_tdvp_methods.jl")
         end
 
         tdvp2_atol=1e-8
-        @testset "TDVP2 (atol=$tdvp2_atol)" begin
+        @testset "TDVP2 with ordinary MPS (atol=$tdvp2_atol)" begin
             res_tdvp2 = siam_tdvp2(;
                 dt=dt,
                 tmax=tmax,
@@ -119,6 +119,23 @@ include("compare_tdvp_methods.jl")
             @test all(
                 all(isapprox.(r1, r2; atol=tdvp2_atol)) for
                 (r1, r2) in zip(res_tdvp1, res_tdvp2)
+            )
+        end
+
+        @testset "TDVP2 with inverse-canonical MPS (atol=$tdvp2_atol)" begin
+            res_tdvp2_ic = siam_tdvp2_ic(;
+                dt=dt,
+                tmax=tmax,
+                freqs=freqs,
+                couplings=couplings,
+                check_sites=sites,
+                init=alternate,
+                cutoff=1e-16,
+            )
+
+            @test all(
+                all(isapprox.(r1, r2; atol=tdvp2_atol)) for
+                (r1, r2) in zip(res_tdvp1, res_tdvp2_ic)
             )
         end
 
