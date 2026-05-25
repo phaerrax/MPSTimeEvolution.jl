@@ -169,8 +169,7 @@ function replace_and_decompose!(ψ::InverseCanonicalMPS, M::ITensor; kwargs...)
             kwargs...,
         )
 
-        println()
-        site_ts[ns[n]] = (U * S) * delta(inds(S))# = Λₙ₋₁ U S
+        site_ts[ns[n]] = (U * S) * delta(inds(S))  # = Λₙ₋₁ U S
         # This tensor already contains the singular values on the left, because it comes
         # from the decomposition of M = S * V.
         bond_ts[ns[n]] = inv.(S)

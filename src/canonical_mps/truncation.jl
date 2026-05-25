@@ -143,10 +143,10 @@ function ITensorMPS.truncate!(
 
         callback(; link=(j => j - 1), truncation_error=spec.truncerr)
 
-        # Restore the inverse canonical form.
+        # Restore the inverse canonical form (use deltas to restore the index structure).
+        site_ts[j - 1] = (W * S) * delta(inds(S))
         bond_ts[j - 1] = inv.(S)
-        site_ts[j] = S * U
-        site_ts[j - 1] = W * S
+        site_ts[j] = (S * U) * delta(inds(S))
     end
 
     return ψ
