@@ -52,6 +52,7 @@ include("tdvp_variants/tdvp2vec.jl")
 include("tdvp_variants/adjtdvp1vec.jl")
 include("tdvp_variants/tdvp_other.jl")
 include("tdvp_variants/jointtdvp1.jl")
+include("tdvp_variants/tdvp2.jl")
 
 # TEBD
 include("opsum_to_tebdsequence.jl")

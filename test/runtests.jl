@@ -104,6 +104,24 @@ include("compare_tdvp_methods.jl")
             )
         end
 
+        tdvp2_atol=1e-8
+        @testset "TDVP2 (atol=$tdvp2_atol)" begin
+            res_tdvp2 = siam_tdvp2(;
+                dt=dt,
+                tmax=tmax,
+                freqs=freqs,
+                couplings=couplings,
+                check_sites=sites,
+                init=alternate,
+                cutoff=1e-16,
+            )
+
+            @test all(
+                all(isapprox.(r1, r2; atol=tdvp2_atol)) for
+                (r1, r2) in zip(res_tdvp1, res_tdvp2)
+            )
+        end
+
         @testset "TDVP1 with superfermion states" begin
             res_tdvp1vec_sf = siam_tdvp1vec_superfermions(;
                 dt=dt,

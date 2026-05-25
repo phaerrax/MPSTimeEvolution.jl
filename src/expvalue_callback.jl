@@ -153,7 +153,33 @@ function measure_localops!(cb::ExpValueCallback, state::MPS, site::Int, alg::TDV
     return nothing
 end
 
-function compute_norm!(cb::ExpValueCallback, state::MPS, alg::TDVP1; current_time)
+function measure_localops!(cb::ExpValueCallback, state::MPS, b::Int, alg::TDVP2)
+    # When we are sweeping right-to-left, once the block at sites (b, b+1) has been evolved,
+    # the tensor at ψ[b + 1] has completed its evolution within the time step dt.
+    # The MPS is
+    # • left-orthogonal from ψ[1] to ψ[b - 1]
+    # • right-orthogonal from ψ[b] to ψ[end]
+    # so this is a good time to measure observables that are local to site b+1: when
+    # contracting in inner(ψ', A(n), ψ), all the sites left of ψ[b] (excluded) give the
+    # identity, and so do all those right of ψ[b + 1].  The measurement can then be
+    # performed using the tensor composed by only ψ[b] and ψ[b + 1].
+
+    # Operators whose support is contained in `site+1:end` have already been measured in
+    # previous calls of this function.
+    for localop in filter(l -> first(domain(l)) == b+1, ops(cb))
+        measurements(cb)[localop][end] = _expval_while_sweeping(state, localop)
+    end
+    # If b == 1, meaning that the right-to-left sweep has ended, we also measure on the
+    # first site.
+    if b == 1
+        for localop in filter(l -> first(domain(l)) == 1, ops(cb))
+            measurements(cb)[localop][end] = _expval_while_sweeping(state, localop)
+        end
+    end
+    return nothing
+end
+
+function compute_norm!(cb::ExpValueCallback, state::MPS, alg::TDVP; current_time)
     if isempty(measurement_ts(cb))
         prev_t = 0
     else
@@ -285,7 +311,7 @@ function compute_trace!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec; current_ti
 end
 
 function apply!(
-    cb::ExpValueCallback, state::MPS, alg::TDVP1; t, sweepend, sweepdir, site, kwargs...
+    cb::ExpValueCallback, state::MPS, alg::TDVP; t, sweepend, sweepdir, site, kwargs...
 )
     if isempty(measurement_ts(cb))
         # Initialize `cb` here.

@@ -127,6 +127,57 @@ function siam_tdvp1(; dt, tmax, freqs, couplings, check_sites, init)
     return f["time"], results...
 end
 
+function siam_tdvp2(; dt, tmax, freqs, couplings, check_sites, init, cutoff)
+    N = length(freqs)
+    sites = siteinds("Fermion", N)
+
+    state_0 = MPS(sites, init)
+    maxdim = maximum(maxlinkdims(state_0))
+    state_0 = enlargelinks(state_0, maxdim; ref_state=init)
+
+    h = spin_chain(freqs, couplings, sites)
+    H = MPO(h, sites)
+
+    site_pairs = [
+        (check_sites[j], check_sites[i]) for i in eachindex(check_sites) for j in 1:(i - 1)
+    ]
+    operators = [
+        [LocalOperator(n => "n") for n in check_sites]
+        [
+            LocalOperator((n1 => "a", jws(n1, n2)..., n2 => "adag")) for
+            (n1, n2) in site_pairs
+        ]
+        [
+            LocalOperator((n1 => "adag", jws(n1, n2)..., n2 => "a")) for
+            (n1, n2) in site_pairs
+        ]
+    ]
+    cb = ExpValueCallback(operators, sites, dt)
+
+    tmpfile = tempname()
+
+    tdvp2!(
+        state_0,
+        H,
+        dt,
+        tmax;
+        callback=cb,
+        progress=false,
+        io_file=tmpfile,
+        io_ranks="/dev/null",
+        io_times="/dev/null",
+        maxdim=maxdim,
+        cutoff=cutoff,
+    )
+
+    f = CSV.File(tmpfile)
+    results = [
+        complex.(f["$(l)_re"], f["$(l)_im"]) ./ complex.(f["Norm_re"], f["Norm_im"]) for
+        l in MPSTimeEvolution.name.(MPSTimeEvolution.ops(cb))
+    ]
+    return f["time"], results...
+end
+
 function siam_tdvp1_with_qns(; dt, tmax, freqs, couplings, check_sites, init)
     N = length(freqs)
     sites = siteinds("Fermion", N; conserve_nfparity=true)
