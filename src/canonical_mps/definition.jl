@@ -123,7 +123,7 @@ function (::Type{MPST})(
     site_tensors = Vector{ITensor}(undef, N)
     bond_tensors = OffsetVector(Vector{ITensor}(undef, N+1), 0:N)
 
-    link_indices_left = [Index(1, "Link,l=$i") for i in 1:(N - 1)]
+    link_indices_left = [Index(1, "Link,l=$i") for i in 2:N]
     link_indices_right = [Index(1, "Link,r=$i") for i in 1:(N - 1)]
     for i in 1:N
         s = sites[i]
@@ -194,7 +194,7 @@ function (::Type{MPST})(
     bond_ts = Vector{ITensor}(undef, N-1)
     # We'll add the trivial edge bonds and convert it to an OffsetVector later.
 
-    link_indices_left = [Index(1; tags="Link,l=$n") for n in 1:(N - 1)]
+    link_indices_left = [Index(1; tags="Link,l=$n") for n in 2:N]
     link_indices_right = [Index(1; tags="Link,r=$n") for n in 1:(N - 1)]
 
     if N == 1
