@@ -23,3 +23,9 @@ OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 Permutations = "2ae35dd2-176d-5d53-8349-f30d82d94d4f"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 TypeParameterAccessors = "7e5a90cf-f82e-492e-a09b-e3e26432c138"
+
+[weakdeps]
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+
+[extensions]
+MPSTimeEvolutionMPIExt = "MPI"
