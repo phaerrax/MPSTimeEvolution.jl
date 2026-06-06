@@ -492,8 +492,8 @@ end
     canonicalize(ψ::VidalMPS; kwargs...)
     canonicalize(ψ::InverseCanonicalMPS; kwargs...)
 
-Return a `VidalMPS` which is equivalent to `ψ` and satisfies the canonical gauge conditions,
-whether `ψ` satisfies them or not.
+Return a new MPS of the same type as `ψ` which is equivalent to it and satisfies the
+(inverse-) canonical gauge conditions, whether `ψ` satisfies them or not.
 
 The process involves a sequence of singular-value decompositions, to which a `cutoff`
 keyword argument can be forwarded.

@@ -14,7 +14,8 @@ The package implements:
   in its standard version as well as
    * its variant with adaptive bond dimensions [Dunnett2021:adaptive_tdvp1](@cite),
    * a non-unitary version (for vectorised mixed states);
-* matrix-product states in the *Vidal* (or *canonical*) gauge,
+* matrix-product states in the *Vidal* (or *canonical*) and *inverse-canonical*
+  gauges,
 * the time-evolving block-decimation algorithm (TEBD) for Vidal-form MPS,
   together with automatic 1st and 2nd order Suzuki-Trotter decompositions.
 

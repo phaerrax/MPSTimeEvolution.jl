@@ -117,7 +117,7 @@ the results.
 A cutoff of 1e-15 is used by default, and in general users should set their own cutoff for
 their particular application.
 
-See [`ITensorMPS.add`](@extref) for an explanation of the accepted arguments and some
+See ITensorMPS' documentation of `+` for an explanation of the accepted arguments and some
 examples.
 """
 function Base.:(+)(
