@@ -1,5 +1,6 @@
 using Test, Documenter, MPSTimeEvolution
 using LinearAlgebra, ITensors, ITensorMPS, Observers, CSV, LindbladVectorizedTensors
+using MPI
 
 using MPSTimeEvolution:
     _sf_translate_sites,
@@ -202,6 +203,11 @@ end
 include("joint_tdvp.jl")
 @testset "Joint TDVP1 method" begin
     @test siam_check_jointtdvp1()
+end
+
+@testset "Parallel TDV2" begin
+    np = 4
+    run(`$(mpiexec()) -np $np $(Base.julia_cmd()) mpi_tdvp2.jl`)
 end
 
 include("tdvp_sum_mpos.jl")
