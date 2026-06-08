@@ -46,7 +46,7 @@ thermal equilibrium:
 We transform this system into a form which is more suitable to the MPS
 formalism with a _chain-mapping_ algorithm, specifically T-TEDOPA, that
 replaces such a continuous environment into a discrete, linear chain of bosonic
-modes: we obtain a new Hamiltonian
+modes: we obtain a new environment described by the Hamiltonian
 
 ```math
 \begin{gather*}
@@ -60,7 +60,8 @@ H'\Int = \sigma_x \otimes (A_1 + \adj{A_1})
 \end{gather*}
 ```
 
-such that the open-system dynamics of the spin is the same.
+and which starts from the vacuum state, such that the open-system dynamics of
+the spin is the same.
 We'll use the [TEDOPA](https://github.com/phaerrax/TEDOPA.jl) package to compute
 the chain mapping, and truncate the infinite chain to \\(N=20\\) sites.
 

@@ -1,5 +1,6 @@
 using Documenter, DocumenterCitations, DocumenterInterLinks
 using MPSTimeEvolution
+using MPI  # --> MPSTimeEvolutionMPIExt extension
 
 # doctest dependencies
 using ITensors, ITensorMPS, KrylovKit, LindbladVectorizedTensors
@@ -29,6 +30,7 @@ makedocs(;
             "examples/time_dependent_tdvp.md",
             "examples/tdvp1_sf.md",
             "examples/tdvp1_adaptive.md",
+            "examples/tdvp2_parallel.md",
             "examples/tebd.md",
         ],
     ],

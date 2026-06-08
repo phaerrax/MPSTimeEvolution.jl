@@ -12,12 +12,15 @@ The package implements:
 * the one-site time-dependent variational principle (TDVP1)
   [Lubich2015:tdvp_evolution,Haegeman2016:unifying_time_evolution_optimization_mps,Paeckel2019:time_evolution_methods](@cite),
   in its standard version as well as
-   * its variant with adaptive bond dimensions [Dunnett2021:adaptive_tdvp1](@cite),
+   * its variant with adaptive bond dimensions
+     [Dunnett2021:adaptive_tdvp1](@cite),
    * a non-unitary version (for vectorised mixed states);
 * matrix-product states in the *Vidal* (or *canonical*) and *inverse-canonical*
   gauges,
 * the time-evolving block-decimation algorithm (TEBD) for Vidal-form MPS,
-  together with automatic 1st and 2nd order Suzuki-Trotter decompositions.
+  together with automatic 1st and 2nd order Suzuki-Trotter decompositions,
+* the two-site time-dependent variational principle (TDVP2), in a serial and
+  a parallel version based on [Secular2020:parallel_tdvp](@cite).
 
 See [Reference](@ref) for a complete list of features, and a description of the
 available methods.
