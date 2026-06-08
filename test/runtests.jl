@@ -207,7 +207,32 @@ end
 
 @testset "Parallel TDV2" begin
     np = 4
-    run(`$(mpiexec()) -np $np $(Base.julia_cmd()) mpi_tdvp2.jl`)
+    serial_io_file, _ = mktemp(; cleanup=false)
+    parallel_io_file, _ = mktemp(; cleanup=false)
+    obs = ["σz($n)" for n in 1:4]
+
+    run(
+        `$(mpiexec()) -np $np $(Base.julia_cmd()) mpi_tdvp2.jl $parallel_io_file $serial_io_file`,
+    )
+
+    serial = CSV.File(serial_io_file)
+    serial_norm = complex.(serial.Norm_re, serial.Norm_im)
+    serial_results = [
+        complex.(serial[op * "_re"], serial[op * "_im"]) ./ serial_norm for op in obs
+    ]
+
+    parallel = CSV.File(parallel_io_file)
+    parallel_norm = complex.(parallel.Norm_re, parallel.Norm_im)
+    parallel_results = [
+        complex.(parallel[op * "_re"], parallel[op * "_im"]) ./ parallel_norm for op in obs
+    ]
+
+    @test all(zip(serial_results, parallel_results)) do (s, p)
+        # Test whether all measured observables give the same results.
+        # It's a quite lax test, since the time-evolution algorithm is still in an early
+        # stage; we can make it more difficult later on.
+        maximum(abs.(s-p)) < 5e-3
+    end
 end
 
 include("tdvp_sum_mpos.jl")

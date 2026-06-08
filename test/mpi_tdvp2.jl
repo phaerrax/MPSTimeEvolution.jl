@@ -4,7 +4,7 @@ using MPSTimeEvolution, ITensors, ITensorMPS
 using MPI
 MPI.Init()
 
-let comm = MPI.COMM_WORLD
+function main(comm, serial_io_file, parallel_io_file)
     prank = MPI.Comm_rank(comm)
     isroot = prank == 0
 
@@ -36,14 +36,11 @@ let comm = MPI.COMM_WORLD
         replacetags!(H[j], "l=$(j-1)" => "h=$(j-1)")
     end
 
-    dt = 0.01
+    dt = 0.001
     tmax = 0.5
 
     cb = ExpValueCallback("σz(1,2,3,4)", s, dt)
     cb′ = ExpValueCallback("σz(1,2,3,4)", s, dt)
-
-    io_file, _ = mktemp(; cleanup=false)
-    io_file′, _ = mktemp(; cleanup=false)
 
     tdvp2_parallel!(
         ψ,
@@ -55,7 +52,7 @@ let comm = MPI.COMM_WORLD
         maxdim=maxdim,
         cutoff=cutoff,
         progress=false,
-        io_file=io_file,
+        io_file=parallel_io_file,
         callback=cb,
     )
 
@@ -68,9 +65,12 @@ let comm = MPI.COMM_WORLD
             progress=false,
             maxdim=maxdim,
             cutoff=cutoff,
-            io_file=io_file′,
+            io_file=serial_io_file,
             callback=cb′,
         )
     end
+
     return nothing
 end
+
+main(MPI.COMM_WORLD, ARGS[1], ARGS[2])
