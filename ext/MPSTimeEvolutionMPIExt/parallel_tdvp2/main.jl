@@ -3,6 +3,123 @@ function rangepart(N)
     return [1:k, (k + 1):2k, (2k + 1):3k, (3k + 1):N]
 end
 
+function partition(
+    ψ::InverseCanonicalMPS, partition_n; site_partitions=rangepart(nsites(ψ))
+)
+    # Partition the MPS into chunks. The bond tensor between two consecutive chunks is
+    # assigned to the chunk on its left.
+    r = site_partitions[partition_n]
+    st = OffsetVector(site_tensors(ψ)[r], r)
+
+    r = if partition_n < length(site_partitions)
+        site_partitions[partition_n]
+    else
+        site_partitions[partition_n][1:(end - 1)]
+        # Maybe we could include site_partitions[partition_n][end] anyway, since that would
+        # be the trivial bond tensor at the edge of the IC MPS, but I'm not sure it wouldn't
+        # mess up the ProjMPO construction.
+    end
+    bt = OffsetVector(bond_tensors(ψ)[r], r)
+
+    return st, bt
+end
+
+function initialize_envs_on_partition(
+    H, ψ, partition_n, comm; site_partitions=rangepart(nsites(ψ))
+)::ProjMPO
+    N = nsites(ψ)
+    procrank = MPI.Comm_rank(comm)
+    # We do the computations on worker 0, regardless of whether it is the root process or
+    # not (it's easier).
+
+    # Odd partitions (we start counting from one!) start sweeping left to right.
+    # This means that they need the environment on the left of the leftmost MPS site of the
+    # partition. Then, as they move rightwards, they will progressively create the missing
+    # left environments. Right environments, instead, must already be there for all sites.
+    # Even partitions work analogously.
+    #
+    # So, for example, the first partition starts from site 1 and needs the right
+    # environments for all sites in the partition, but the left environment for site 1 only.
+    # Partition 3 (say we are using 4 partition in total) starts from the middle of the MPS,
+    # and needs the left environment for the middle site, and the right environments for all
+    # its sites.
+    # Clearly, as the environments are created incrementally, we can recycle the results so
+    # that each left or right environment is computed only once: to this purpose, we perform
+    # one full sweep with a single “base” PH object, then copy the environments created
+    # along the way to the actual PHs.
+    PH = if procrank == 0
+        PH₀ = ProjMPO(H)  # Create a new ProjMPO from scratch.
+        set_nsite!(PH₀, 1)
+        position!(PH₀, ψ, 1)
+        position!(PH₀, ψ, N)  # Sweep to the end.
+
+        # Now all left environments have been created. We can send them to the ProjMPO of
+        # the last partition.
+        MPI.send(PH₀, comm; dest=3)
+
+        # Continue sweeping leftwards until the middle of the MPS.
+        position!(PH₀, ψ, first(site_partitions[3]))
+        # Now we have created all right environments from the middle to the end of the MPS.
+        # We also have the left environments from the start of the MPS to the middle,
+        # created in the sweep from 1 to N above.
+        MPI.send(PH₀, comm; dest=2)
+
+        # Continue this way until we exhaust the partitions.
+        position!(PH₀, ψ, last(site_partitions[2]))
+        MPI.send(PH₀, comm; dest=1)
+
+        position!(PH₀, ψ, first(site_partitions[1]))
+        PH₀  # this is for procrank == 0
+    else
+        MPI.recv(comm; source=0)
+    end
+    MPI.Barrier(comm)
+
+    return PH
+end
+
+function tdvp2_parallel_step!(
+    ψ, PH, partition_n, dt, comm; rootrank=0, maxdim, cutoff, current_time
+)
+    # TODO Make this function not return a new InverseCanonicalMPS object each time, but
+    # work on the partition directly.
+    # Recombining everything into an InverseCanonicalMPS is needed only when we need to
+    # (re-)initialise the ProjMPO environments and when we compute the expectation values
+    # (well, not really, but it's easier that way).
+    N = nsites(ψ)
+    st, bt = partition(ψ, partition_n)
+    isroot = (MPI.Comm_rank(comm) == rootrank)
+
+    tdvp2_parallel_sweep_4p!(
+        Val(partition_n),
+        comm,
+        st,
+        bt,
+        PH,
+        dt;
+        maxdim=maxdim,
+        cutoff=cutoff,
+        current_time=current_time,
+    )
+    MPI.Barrier(comm)  # Wait for everyone to finish...
+
+    @debug "Step $s complete. Gathering data from workers..."
+    sts = MPI.gather(parent(st), comm; root=rootrank)
+    bts = MPI.gather(parent(bt), comm; root=rootrank)
+
+    # Put the MPS chunks back together so that we can compute expectation values later.
+    return if isroot
+        InverseCanonicalMPS(
+            reduce(vcat, sts),
+            OffsetVector([ITensor(1.0); reduce(vcat, bts); ITensor(1.0)], 0:N),
+        )
+    else
+        InverseCanonicalMPS()
+        # We could return nothing, but this way the function is type-stable. (Does it
+        # really make a difference here?)
+    end
+end
+
 function MPSTimeEvolution.tdvp2_parallel!(
     ψ::InverseCanonicalMPS, H::MPO, dt, tmax; kwargs...
 )
@@ -65,8 +182,6 @@ function MPSTimeEvolution.tdvp2_parallel!(
         MPSTimeEvolution.printoutput_ranks(ranks_handle, cb, ψ)
     end
 
-    ranges = rangepart(N)
-    @assert reduce(vcat, rangepart(N)) == 1:N
     partn = procrank+1
 
     # Each worker has its ProjMPO object (each one independent from the others).
@@ -76,63 +191,15 @@ function MPSTimeEvolution.tdvp2_parallel!(
     # ProjMPO outsite the bounds of its chunk.  At the beginning of the evolution the
     # environments in the ProjMPOs need to be generated from scratch, involving all tensors
     # of the MPS.
-    set_nsite!(PH, 1)
-    if partn == 1
-        position!(PH, ψ, first(ranges[partn]))
-    elseif partn == 2
-        position!(PH, ψ, 1)
-        position!(PH, ψ, last(ranges[partn]))
-    elseif partn == 3
-        position!(PH, ψ, N)
-        position!(PH, ψ, first(ranges[partn]))
-    elseif partn == 4
-        position!(PH, ψ, last(ranges[partn]))
-    end
+    @debug "Initialising TDVP environments..."
+    PH = initialize_envs_on_partition(PH.H, ψ, partn, comm)
 
     for s in 1:nsteps
-        ψ = begin  # Maybe this could be a function?
-            # Partition the MPS into four chunks. The bond tensor between two chunks gets
-            # assigned to the chunk on its left.
-            r = ranges[partn]
-            st = OffsetVector(site_tensors(ψ)[r], r)
+        isroot && @debug "Executing step $n of $nsteps..."
+        ψ = tdvp2_parallel_step!(
+            ψ, PH, partn, dt, comm; rootrank=0, maxdim, cutoff, current_time
+        )
 
-            r = if partn < 4
-                ranges[partn]
-            else
-                ranges[partn][1:(end - 1)]
-            end
-            # Maybe we'd get the same result by splitting rangepart(N-1)?
-            bt = OffsetVector(bond_tensors(ψ)[r], r)
-
-            # Parallel sweeps
-            st, bt, PH = tdvp2_parallel_sweep_4p(
-                Val(partn),
-                comm,
-                st,
-                bt,
-                PH,
-                dt;
-                maxdim=maxdim,
-                cutoff=cutoff,
-                current_time=current_time,
-            )
-            MPI.Barrier(comm)  # Wait for everyone to finish...
-
-            @debug "Step $s complete. Gathering data from workers..."
-            sts = MPI.gather(parent(st), comm; root=rootrank)
-            bts = MPI.gather(parent(bt), comm; root=rootrank)
-
-            # Recompose the MPS so that we can compute expectation values later.
-            # return
-            if isroot
-                InverseCanonicalMPS(
-                    reduce(vcat, sts),
-                    OffsetVector([ITensor(1.0); reduce(vcat, bts); ITensor(1.0)], 0:N),
-                )
-            else
-                nothing
-            end
-        end
         isroot && @debug "Broadcasting the MPS to all workers..."
         ψ = MPI.bcast(ψ, comm; root=rootrank)
         # Broadcast the updates MPS to all workers, so that they can use it when the new

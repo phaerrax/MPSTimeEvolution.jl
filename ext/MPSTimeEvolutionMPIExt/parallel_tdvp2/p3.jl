@@ -9,7 +9,7 @@
 
 # Process 3
 # =========
-function tdvp2_parallel_sweep_4p(
+function tdvp2_parallel_sweep_4p!(
     ::Val{3}, comm::MPI.Comm, site_ts, bond_ts, PH, dt; maxdim, cutoff, current_time
 )
     site_range = eachindex(site_ts)
