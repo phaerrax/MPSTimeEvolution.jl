@@ -196,17 +196,19 @@ function MPSTimeEvolution.tdvp2_parallel!(
 
     for s in 1:nsteps
         isroot && @debug "Executing step $n of $nsteps..."
-        ψ = tdvp2_parallel_step!(
+        result = @timed tdvp2_parallel_step!(
             ψ, PH, partn, dt, comm; rootrank=0, maxdim, cutoff, current_time
         )
+        # result.value -> actual result
+        # result.time -> elapsed time
 
         isroot && @debug "Broadcasting the MPS to all workers..."
-        ψ = MPI.bcast(ψ, comm; root=rootrank)
+        ψ = MPI.bcast(result.value, comm; root=rootrank)
         # Broadcast the updates MPS to all workers, so that they can use it when the new
         # step begins.
 
         current_time += dt
-        stime = 0.0  # FIXME
+        stime = result.time
 
         if isroot
             @debug "Computing expectation values at t = $current_time."
@@ -224,7 +226,7 @@ function MPSTimeEvolution.tdvp2_parallel!(
                     MPSTimeEvolution.printoutput_data(io_handle, cb, ψ; kwargs...)
                 end
                 MPSTimeEvolution.printoutput_ranks(ranks_handle, cb, ψ)
-                MPSTimeEvolution.printoutput_stime(times_handle, 0.0)
+                MPSTimeEvolution.printoutput_stime(times_handle, stime)
             end
 
             MPSTimeEvolution.checkdone!(cb) && break
