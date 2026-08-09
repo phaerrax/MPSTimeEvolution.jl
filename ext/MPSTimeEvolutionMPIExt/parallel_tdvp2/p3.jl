@@ -114,7 +114,8 @@ function tdvp2_parallel_sweep_4p!(
     Ψᵣ = MPI.recv(comm; source=3, tag=intcode("PsiR"))
     PH.LR[(bond + 2):end] .= γᵣ
 
-    # • Perform 2-site update on the boundary between process 3 and process 4
+    # • Perform 2-site update on the boundary between process 3 and process 4,
+    #   evolving Ψₗ, V, Ψᵣ forwards by dt.
     set_nsite!(PH, 2)
     Ψₗ, V, Ψᵣ = twositeupdate(
         Ψₗ,
@@ -122,7 +123,7 @@ function tdvp2_parallel_sweep_4p!(
         Ψᵣ,
         PH,
         bond,
-        -0.5im*dt;
+        -im*dt;
         maxdim=maxdim,
         cutoff=cutoff,
         sweepdir="right",

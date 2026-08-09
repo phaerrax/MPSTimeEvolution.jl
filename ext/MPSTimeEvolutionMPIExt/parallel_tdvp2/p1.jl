@@ -77,14 +77,14 @@ function tdvp2_parallel_sweep_4p!(
     # We update it together with `site_ts[bond]` and `bond_ts[bond]` in a “detached” way,
     # then we send it back to process 2 and forget about it.
 
-    # • Perform two-site update on (Ψ[bond], Ψ[bond+1])
+    # • Evolve Ψₗ, V, Ψᵣ forwards by dt.
     Ψₗ, V, Ψᵣ = twositeupdate(
         Ψₗ,
         V,
         Ψᵣ,
         PH,
         bond,
-        -0.5im*dt;
+        -im*dt;
         maxdim=maxdim,
         cutoff=cutoff,
         sweepdir="right",
