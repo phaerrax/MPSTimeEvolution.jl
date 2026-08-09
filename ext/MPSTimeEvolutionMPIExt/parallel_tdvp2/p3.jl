@@ -64,7 +64,7 @@ function tdvp2_parallel_sweep_4p!(
     bond = first(site_range)
     set_nsite!(PH, 1)
     #position!(PH, site_ts, bond_ts, bond)
-    site_ts[bond] = onesiteupdate(Ψᵣ, PH, bond, -0.5im*dt; current_time=current_time+0.5dt)
+    site_ts[bond] = onesiteupdate(Ψᵣ, PH, bond, 0.5im*dt; current_time=current_time+0.5dt)
 
     # • Sweep right, starting from bond = first(site_range)...
     while true
@@ -146,7 +146,7 @@ function tdvp2_parallel_sweep_4p!(
     bond = last(site_range)
 
     # • Update Ψₗ (PH is already in the correct position)
-    site_ts[bond] = onesiteupdate(Ψₗ, PH, bond, -0.5im*dt; current_time=current_time+dt)
+    site_ts[bond] = onesiteupdate(Ψₗ, PH, bond, 0.5im*dt; current_time=current_time+dt)
 
     # • Sweep left with full two-site updates, from bond = last(site_range)-1
     while true

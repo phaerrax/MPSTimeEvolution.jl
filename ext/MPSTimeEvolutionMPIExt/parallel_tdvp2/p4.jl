@@ -79,7 +79,7 @@ function tdvp2_parallel_sweep_4p!(
     # • Ψᵣ ⟵  leftmost site, update Ψᵣ
     set_nsite!(PH, 1)
     site_ts[bond + 1] = onesiteupdate(
-        Ψᵣ, PH, bond+1, -0.5im*dt; current_time=current_time+dt
+        Ψᵣ, PH, bond+1, 0.5im*dt; current_time=current_time+dt
     )
 
     # • Repeat... 

@@ -84,7 +84,7 @@ function tdvp2_parallel_sweep_4p!(
     # We have also put it in the correct configuration for the following single-site update.
 
     # • Update Ψₗ
-    site_ts[bond] = onesiteupdate(Ψₗ, PH, bond, -0.5im*dt; current_time=current_time+0.5dt)
+    site_ts[bond] = onesiteupdate(Ψₗ, PH, bond, 0.5im*dt; current_time=current_time+0.5dt)
 
     # • Discard βₗ (this happens automatically once we shift PH)
 
@@ -156,7 +156,7 @@ function tdvp2_parallel_sweep_4p!(
 
     # • Update Ψᵣ
     #   We are now sweeping back right.
-    site_ts[bond + 1] = onesiteupdate(Ψᵣ, PH, bond, -0.5im*dt; current_time=current_time+dt)
+    site_ts[bond + 1] = onesiteupdate(Ψᵣ, PH, bond, 0.5im*dt; current_time=current_time+dt)
 
     # • Repeat ...  until Ψᵣ is the partition’s rightmost site tensor
     while true
@@ -218,7 +218,7 @@ function tdvp2_parallel_sweep_4p!(
         Ψᵣ,
         PH,
         bond,
-        -0.5im*dt;
+        -im*dt;
         maxdim=maxdim,
         cutoff=cutoff,
         sweepdir="right",

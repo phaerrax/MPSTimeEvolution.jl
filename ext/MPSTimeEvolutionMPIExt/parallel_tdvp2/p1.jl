@@ -109,7 +109,7 @@ function tdvp2_parallel_sweep_4p!(
 
     # Update Ψₗ.
     site_ts[bond] = onesiteupdate(
-        site_ts[bond], PH, bond, -0.5im*dt; current_time=current_time+dt
+        site_ts[bond], PH, bond, 0.5im*dt; current_time=current_time+dt
     )
 
     # • Repeat ... until Ψₗ is partition’s leftmost site tensor
