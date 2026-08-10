@@ -1,21 +1,21 @@
 # TDVP2 with MPI example script
-
-using MPSTimeEvolution, ITensors, ITensorMPS
 using MPI
+using ITensors, ITensorMPS, MPSTimeEvolution
+
 MPI.Init()
 
 function main(comm, serial_io_file, parallel_io_file)
     prank = MPI.Comm_rank(comm)
     isroot = prank == 0
 
-    N = 20
+    N = 4*8
 
     # Use bcast otherwise the indices in different workers will have different IDs and will
     # not match in contractions.
     s = MPI.bcast(siteinds("S=1/2", N), comm)
 
-    maxdim = 40
-    cutoff = 1e-6
+    maxdim = 20
+    cutoff = 1e-16
     ψ = MPI.bcast(InverseCanonicalMPS(s, n -> n == 1 ? "Up" : "Dn"), comm)
     ψ′ = isroot ? InverseCanonicalMPS(s, n -> n == 1 ? "Up" : "Dn") : nothing
 
@@ -36,7 +36,7 @@ function main(comm, serial_io_file, parallel_io_file)
         replacetags!(H[j], "l=$(j-1)" => "h=$(j-1)")
     end
 
-    dt = 0.001
+    dt = 0.01
     tmax = 0.5
 
     cb = ExpValueCallback("σz(1,2,3,4)", s, dt)
