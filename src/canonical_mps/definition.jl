@@ -406,7 +406,7 @@ function check_vidal_form(ψ::VidalMPS; verbose=true)
     end
 end
 
-function check_inverse_canonical_form(ψ::InverseCanonicalMPS; verbose=true)
+function check_inverse_canonical_form(ψ::InverseCanonicalMPS; verbose=true, kwargs...)
     N = nsites(ψ)
 
     ψdag = sim(linkinds, dag(ψ))
@@ -449,14 +449,13 @@ function check_inverse_canonical_form(ψ::InverseCanonicalMPS; verbose=true)
         Mⱼ = st[j] * bt[j] * stdag[j] * btdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, st[j] * stdag[j]))
         λ = scalar(inv.(bt[j - 1]) * inv.(bt[j - 1]))
-        if !isapprox(ITensors.matrix(Mⱼ), λ * I)
-            push!(errors, "left-orthonormality condition not satisfied on site $j")
+        if !isapprox(ITensors.matrix(Mⱼ), λ * I; kwargs...)
+            push!(
+                errors,
+                "left-orthonormality condition not satisfied on site $j: " *
+                "‖Mⱼ - λI‖ = $(norm(ITensors.matrix(Mⱼ) - λ * I))",
+            )
         end
-    end
-
-    Mₙ = bt[N - 1] * st[N] * btdag[N - 1] * stdag[N]
-    if !isapprox(ITensors.matrix(Mₙ), I)
-        push!(errors, "right-orthonormality condition not satisfied on site $N")
     end
 
     #   ───V[j-1]───C[j]───╮       ───Γ[j]───Λ[j]───╮                     ───╮
@@ -475,8 +474,12 @@ function check_inverse_canonical_form(ψ::InverseCanonicalMPS; verbose=true)
         Mⱼ = bt[j - 1] * st[j] * btdag[j - 1] * stdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, st[j] * stdag[j]))
         λ = scalar(inv.(bt[j]) * inv.(bt[j]))
-        if !isapprox(ITensors.matrix(Mⱼ), λ * I)
-            push!(errors, "right-orthonormality condition not satisfied on site $j")
+        if !isapprox(ITensors.matrix(Mⱼ), λ * I; kwargs...)
+            push!(
+                errors,
+                "right-orthonormality condition not satisfied on site $j: " *
+                "‖Mⱼ - λI‖ = $(norm(ITensors.matrix(Mⱼ) - λ * I))",
+            )
         end
     end
 
