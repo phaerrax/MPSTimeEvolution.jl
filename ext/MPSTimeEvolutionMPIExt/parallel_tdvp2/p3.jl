@@ -13,7 +13,6 @@ function tdvp2_parallel_sweep_4p!(
     ::Val{3}, comm::MPI.Comm, site_ts, bond_ts, PH, dt; maxdim, cutoff, current_time
 )
     site_range = eachindex(site_ts)
-    @debug partsweep_start_msg(3, site_range, current_time)
 
     # • Ψᵣ ⟵  partition’s leftmost site tensor
     bond = first(site_range)-1

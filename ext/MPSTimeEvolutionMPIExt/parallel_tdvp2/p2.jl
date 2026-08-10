@@ -13,7 +13,6 @@ function tdvp2_parallel_sweep_4p!(
     ::Val{2}, comm::MPI.Comm, site_ts, bond_ts, PH, dt; maxdim, cutoff, current_time
 )
     site_range = eachindex(site_ts)
-    @debug partsweep_start_msg(2, site_range, current_time)
 
     # • Ψₗ ⟵  partition’s rightmost site tensor
     bond = last(site_range)
@@ -48,9 +47,6 @@ function tdvp2_parallel_sweep_4p!(
     MPI.send(PH.LR[1:(bond - 1)], comm; dest=2, tag=intcode("betaL"))
 
     # • Perform a two-site update across the partition border.
-    @debug inds(Ψₗ)
-    @debug inds(V)
-    @debug inds(Ψᵣ)
     Ψₗ, V, Ψᵣ = twositeupdate(
         Ψₗ,
         V,

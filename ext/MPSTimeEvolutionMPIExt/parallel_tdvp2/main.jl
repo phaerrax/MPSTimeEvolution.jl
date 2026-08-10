@@ -25,7 +25,7 @@ function partition(
 end
 
 function initialize_envs_on_partition(
-    H, ψ, partition_n, comm; site_partitions=rangepart(nsites(ψ))
+    H, ψ::InverseCanonicalMPS, partition_n, comm; site_partitions=rangepart(nsites(ψ))
 )::ProjMPO
     N = nsites(ψ)
     procrank = MPI.Comm_rank(comm)
@@ -103,7 +103,7 @@ function tdvp2_parallel_step!(
     )
     MPI.Barrier(comm)  # Wait for everyone to finish...
 
-    @debug "Step $s complete. Gathering data from workers..."
+    isroot && @debug "Sweep completed. Gathering data from workers..."
     sts = MPI.gather(parent(st), comm; root=rootrank)
     bts = MPI.gather(parent(bt), comm; root=rootrank)
 
@@ -191,24 +191,25 @@ function MPSTimeEvolution.tdvp2_parallel!(
     # ProjMPO outsite the bounds of its chunk.  At the beginning of the evolution the
     # environments in the ProjMPOs need to be generated from scratch, involving all tensors
     # of the MPS.
-    @debug "Initialising TDVP environments..."
+    isroot && @debug "Initialising TDVP environments..."
     PH = initialize_envs_on_partition(PH.H, ψ, partn, comm)
 
     for s in 1:nsteps
-        isroot && @debug "Executing step $n of $nsteps..."
+        isroot && @debug "Executing step $s of $nsteps..."
         result = @timed tdvp2_parallel_step!(
             ψ, PH, partn, dt, comm; rootrank=0, maxdim, cutoff, current_time
         )
         # result.value -> actual result
         # result.time -> elapsed time
 
-        isroot && @debug "Broadcasting the MPS to all workers..."
-        ψ = MPI.bcast(result.value, comm; root=rootrank)
-        # Broadcast the updates MPS to all workers, so that they can use it when the new
-        # step begins.
-
         current_time += dt
         stime = result.time
+
+        # Broadcast the updates MPS to all workers, so that they can use it when the new
+        # step begins.
+        isroot && @debug "Broadcasting the MPS to all workers..."
+        ψ = MPI.bcast(result.value, comm; root=rootrank)
+
 
         if isroot
             @debug "Computing expectation values at t = $current_time."

@@ -13,7 +13,6 @@ function tdvp2_parallel_sweep_4p!(
     ::Val{4}, comm::MPI.Comm, site_ts, bond_ts, PH, dt; maxdim, cutoff, current_time
 )
     site_range = eachindex(site_ts)
-    @debug partsweep_start_msg(4, site_range, current_time)
 
     bond = last(site_range)
 
