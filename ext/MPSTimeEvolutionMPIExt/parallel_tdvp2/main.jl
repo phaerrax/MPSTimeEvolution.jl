@@ -136,11 +136,12 @@ function MPSTimeEvolution.tdvp2_parallel!(
     exp_tol = get(kwargs, :exp_tol, 1e-14)
     krylovdim = get(kwargs, :krylovdim, 30)
     maxiter = get(kwargs, :maxiter, 100)
-    normalize = get(kwargs, :normalize, true)
+    normalize_state = get(kwargs, :normalize, true)
     io_file = get(kwargs, :io_file, nothing)
     ranks_file = get(kwargs, :io_ranks, nothing)
     times_file = get(kwargs, :io_times, nothing)
     store_state0 = get(kwargs, :store_psi0, false)
+    norm_threshold = get(kwargs, :norm_threshold, nothing)
 
     procrank = MPI.Comm_rank(comm)
     isroot = (procrank == rootrank)
@@ -210,6 +211,22 @@ function MPSTimeEvolution.tdvp2_parallel!(
         isroot && @debug "Broadcasting the MPS to all workers..."
         ψ = MPI.bcast(result.value, comm; root=rootrank)
 
+        # Check if norm exceeds the threshold; if it does, recanonicalise the MPS (and
+        # consequently recompute the PHs).  The recanonicalisation will also normalise ψ.
+        # (Note that computing the norm with the `norm` function requires the MPS to be in
+        # the IC form, which is not exactly guaranteed here...).
+        ψ_norm = norm(ψ)
+        if !isnothing(norm_threshold) && abs(1 - ψ_norm) > norm_threshold
+            ψ = if isroot
+                @debug "State norm is now $ψ_norm: recanonicalizing the MPS..."
+                canonicalize(ψ; use_absolute_cutoff=true, cutoff=0)
+            else
+                InverseCanonicalMPS()
+            end
+            ψ = MPI.bcast(ψ, comm; root=rootrank)
+            PH = initialize_envs_on_partition(PH.H, ψ, partn, comm)
+            # Don't run this as root only! All workers need to recreate their PHs.
+        end
 
         if isroot
             @debug "Computing expectation values at t = $current_time."

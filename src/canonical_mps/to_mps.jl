@@ -36,7 +36,7 @@ end
 
 # MPS to VidalMPS: orthogonalise the MPS first, then use the SVD to separate the bond
 # tensors from the site tensors until we reach the opposite edge of the MPS.
-function Base.convert(::Type{VidalMPS}, ψ::MPS; cutoff=1e-8)
+function Base.convert(::Type{VidalMPS}, ψ::MPS; kwargs...)
     # We follow Schollwöck's approach from his 2011 review article ("Conversion A, B → Γ Λ"
     # starting at page 138).
 
@@ -86,12 +86,7 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; cutoff=1e-8)
 
     # Decompose the first MPS tensor.
     A, bond_ts[1], V = svd(
-        ψ[1],
-        uniqueinds(ψ[1], ψ[2]);
-        lefttags="Link,r=1",
-        righttags="Link,l=2",
-        use_absolute_cutoff=true,
-        cutoff=cutoff,
+        ψ[1], uniqueinds(ψ[1], ψ[2]); lefttags="Link,r=1", righttags="Link,l=2", kwargs...
     )
 
     # From Eq. (159): A⁽ⁿ⁾ = Λ⁽ⁿ⁻¹⁾ Γ⁽ⁿ⁾, with A⁽⁰⁾ = 1.
@@ -106,8 +101,7 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; cutoff=1e-8)
             uniqueinds(M, ψ[n + 1]);
             lefttags="Link,r=$n",
             righttags="Link,l=$(n+1)",
-            use_absolute_cutoff=true,
-            cutoff=cutoff,
+            kwargs...,
         )
 
         # ───A[n]─── = ───Λ[n-1]──────Γ[n]────
@@ -163,10 +157,10 @@ end
 
 # MPS to InverseCanonicalMPS: orthogonalise the MPS first, then use the SVD to separate the
 # bond tensors from the site tensors until we reach the opposite edge of the MPS.
-function Base.convert(::Type{InverseCanonicalMPS}, ψ::MPS; cutoff=1e-8)
+function Base.convert(::Type{InverseCanonicalMPS}, ψ::MPS; kwargs...)
     # Cheap way of doing the conversion: first convert ψ to a VidalMPS, which takes care of
     # performing the SVDs correctly. Then multiply/divide by the bond tensors accordingly.
-    return convert(InverseCanonicalMPS, convert(VidalMPS, ψ; cutoff=cutoff))
+    return convert(InverseCanonicalMPS, convert(VidalMPS, ψ; kwargs...))
 end
 
 function Base.convert(::Type{InverseCanonicalMPS}, ψ::VidalMPS)
@@ -175,7 +169,7 @@ function Base.convert(::Type{InverseCanonicalMPS}, ψ::VidalMPS)
     Λ = bond_tensors(ψ)
 
     # VidalMPS to InverseCanonicalMPS: Vₖ = Λₖ⁻¹, and
-    #   Cₖ = Λₖ⁻¹ Γₖ Λₖ,
+    #   Cₖ = Λₖ Γₖ Λₖ,
     #   C₁ = Γ₁ Λ₁,
     #   Cₙ = Λₙ₋₁Γₙ.
     #
@@ -243,9 +237,9 @@ function Base.convert(::Type{InverseCanonicalMPS}, ψ::VidalMPS)
 end
 
 # InverseCanonicalMPS to VidalMPS: Λₖ = Vₖ⁻¹, and
-#   Cₖ = Λₖ⁻¹ Γₖ Λₖ,
+#   Cₖ = Λₖ Γₖ Λₖ,
 #   C₁ = Γ₁ Λ₁,
-#   Cₙ = Λₙ₋₁Γₙ.
+#   Cₙ = Λₙ₋₁ Γₙ.
 function Base.convert(::Type{VidalMPS}, ψ::InverseCanonicalMPS)
     N = nsites(ψ)
     C = site_tensors(ψ)

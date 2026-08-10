@@ -497,15 +497,34 @@ end
 
 Return a new MPS of the same type as `ψ` which is equivalent to it and satisfies the
 (inverse-) canonical gauge conditions, whether `ψ` satisfies them or not.
+The returner MPS will be normalised, regardless of whether the original `ψ` should have unit
+norm.
 
 The process involves a sequence of singular-value decompositions, to which a `cutoff`
 keyword argument can be forwarded.
 """
 function canonicalize(ψ::MPST; kwargs...) where {MPST<:ExplicitBondMPS}
     # See the comments in the `+(::Algorithm"directsum", ψs::VidalMPS...)` method to
-    # understand this choice.
-    # Here we orthogonalise the middle MPS on the last site, but I think we can choose
-    # whatever site we like...
-    return convert(MPST, orthogonalize(convert(MPS, ψ), nsites(ψ)); kwargs...)
+    # understand these choices.
+    #
+    # Steps:
+    # 1. The original MPS ψ is converted into a standard MPS. Bond tensors are absorbed into
+    #    site tensors, it's just matrix multiplications and no truncation is performed.
+    #    We also need to normalise the state, otherwise if ‖ψ‖ != 1 the IC gauge will be
+    #    broken and the ‖ψ‖ - 1 discrepancy will come back to bite us in the IC gauge check
+    #    function.
+    ψ_mps = convert(MPS, ψ)
+    normalize!(ψ_mps)
+    # 2. The resulting MPS might not be a valid state, if the original ψ did not respect its
+    #    gauge. However, we can fix the MPS easily by re-orthogonalising it (we
+    #    orthogonalise it on the last site, but I think we can choose whatever site we
+    #    like). This gives us an equivalent MPS but in a correct mixed-canonical form.
+    orthogonalize!(ψ_mps, nsites(ψ))
+    # 3. We convert it back to the original canonical form.
+    #    a. If the target is a VidalMPS, then we decompose the MPS in the Vidal form,
+    #       possibly with truncation (set the `cutoff` keyword argument accordingly).
+    #    b. If the target is an InverseCanonicalMPS, we still compute the Vidal form, then
+    #       we convert it into the inverse-canonical form via some matrix inversions.
+    return convert(MPST, ψ_mps; kwargs...)
     # TODO is there a way to do this without passing through an ordinary MPS?
 end
