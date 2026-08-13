@@ -90,7 +90,9 @@ function tdvp2_parallel_step!(
     st, bt = partition(ψ, partition_n)
     isroot = (MPI.Comm_rank(comm) == rootrank)
 
-    tdvp2_parallel_sweep_4p!(
+    # Each process updates its assigned partition, and returns the total truncation error
+    # accumulated during the evolution, so that we can update the overall norm of the MPS.
+    _, _, _, truncerr = tdvp2_parallel_sweep_4p!(
         Val(partition_n),
         comm,
         st,
@@ -103,15 +105,25 @@ function tdvp2_parallel_step!(
     )
     MPI.Barrier(comm)  # Wait for everyone to finish...
 
-    isroot && @debug "Sweep completed. Gathering data from workers..."
+    isroot && @debug "Sweep complete. Gathering data from workers..."
     sts = MPI.gather(parent(st), comm; root=rootrank)
     bts = MPI.gather(parent(bt), comm; root=rootrank)
 
+    # We compute the norm from the total discarded weights gathered from the partitions.
+    # (Note that MPI.Reduce returns `nothing` on non-root processes, so we edit the norm
+    # only on root. It's not an issue since the other processes don't actually use the MPS
+    # anyway.)
+    tot_truncerr = MPI.Reduce(truncerr, +, comm; root=rootrank)
+    if isroot
+        updated_norm = ψ.norm * sqrt(1 - tot_truncerr)
+    end
+
     # Put the MPS chunks back together so that we can compute expectation values later.
-    return if isroot
+    if isroot
         InverseCanonicalMPS(
             reduce(vcat, sts),
             OffsetVector([ITensor(1.0); reduce(vcat, bts); ITensor(1.0)], 0:N),
+            updated_norm,
         )
     else
         InverseCanonicalMPS()
@@ -142,6 +154,13 @@ function MPSTimeEvolution.tdvp2_parallel!(
     times_file = get(kwargs, :io_times, nothing)
     store_state0 = get(kwargs, :store_psi0, false)
     norm_threshold = get(kwargs, :norm_threshold, nothing)
+
+    # If a real-valued time step `dt` is given, we compute a real-time evolution
+    # given by the operator exp(-itH).
+    # Passing an imaginary time step (and `tmax`) as an argument triggers instead an
+    # evolution according to the operator exp(-tH), which we don't support at the moment,
+    # so we throw an error instead.
+    !isreal(dt) && error("imaginary-time evolution not implemented for parallel TDVP2")
 
     procrank = MPI.Comm_rank(comm)
     isroot = (procrank == rootrank)
@@ -213,12 +232,9 @@ function MPSTimeEvolution.tdvp2_parallel!(
 
         # Check if norm exceeds the threshold; if it does, recanonicalise the MPS (and
         # consequently recompute the PHs).  The recanonicalisation will also normalise ψ.
-        # (Note that computing the norm with the `norm` function requires the MPS to be in
-        # the IC form, which is not exactly guaranteed here...).
-        ψ_norm = norm(ψ)
-        if !isnothing(norm_threshold) && abs(1 - ψ_norm) > norm_threshold
+        if !isnothing(norm_threshold) && abs(1 - norm(ψ)) > norm_threshold
             ψ = if isroot
-                @debug "State norm is now $ψ_norm: recanonicalizing the MPS..."
+                @debug "Re-canonicalising the MPS..."
                 canonicalize(ψ; use_absolute_cutoff=true, cutoff=0)
             else
                 InverseCanonicalMPS()

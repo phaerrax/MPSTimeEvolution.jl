@@ -37,9 +37,19 @@ In this package, a Vidal-form MPS is represented by the `VidalMPS` type, which
 is little more than a container of the two arrays of *site* and *bond*
 tensors.
 
+As we will see below, these tensors are constrained to satisfy some algebraic
+properties, for example the singular values on each bond are always normalised
+such that the sum of their squares is always 1. As a consequence of these
+properties, the norm of such a state is always one, so, in order to be able to
+represent states with arbitrary norm we also add an additional field
+representing the norm of the state, which is separately updated each time the
+MPS is modified by an operator or truncated.
+
 ### Inverse canonical form
 
-The inverse canonical gauge, introduced in [Stoudenmire2013:real_space_parallel_dmrg](@cite), allows us to write an MPS in such a way that each site tensor can be considered an orthogonality centre.
+The inverse canonical gauge, introduced in
+[Stoudenmire2013:real_space_parallel_dmrg](@cite), allows us to write an MPS in
+such a way that each site tensor can be considered an orthogonality centre.
 
 This gauge has a similar structure to the one of the canonical gauge,
 
@@ -188,7 +198,7 @@ and how many the singular values in the bond tensors can be.
 ```jldoctest vidalmps; filter = r"id=\d+" => "id=###"
 julia> v = random_mps(s; linkdims=3);
 
-julia> vv = convert(VidalMPS, v)
+julia> v_c = convert(VidalMPS, v)
 4-site VidalMPS:
  ((dim=2|id=822|"S=1/2,Site,n=1"), (dim=2|id=968|"Link,r=1"))
  ((dim=2|id=968|"Link,r=1"), (dim=2|id=479|"Link,l=2"))
@@ -205,42 +215,36 @@ ordinary `MPS`: you can choose where to place the orthogonality center of the
 resulting MPS via the `ortho_center` keyword argument.
 
 ```jldoctest vidalmps; filter = r"id=\d+" => "id=###"
-julia> convert(MPS, vv; ortho_center=3)
+julia> v_mps = convert(MPS, v_c; ortho_center=3)
 4-element MPS:
  ((dim=2|id=822|"S=1/2,Site,n=1"), (dim=2|id=793|"Link,l=1"))
  ((dim=2|id=229|"S=1/2,Site,n=2"), (dim=3|id=260|"Link,l=2"), (dim=2|id=793|"Link,l=1"))
  ((dim=2|id=161|"S=1/2,Site,n=3"), (dim=2|id=826|"Link,l=3"), (dim=3|id=260|"Link,l=2"))
  ((dim=2|id=643|"S=1/2,Site,n=4"), (dim=2|id=826|"Link,l=3"))
 
+julia> ortho_lims(v_mps)
+3:3
 ```
 
 ### Vector operations
 
-In order to multiply a `VidalMPS` by a scalar (complex) number, or to add two or
-more `VidalMPS`s together, use the `*` and `+` operators, respectively.
+In order to multiply `VidalMPS` and `InverseCanonicalMPS` objects by a scalar
+(complex) number, or to add two or more of them (of the same type) together, use
+the `*` and `+` operators, respectively.
 
 ```jldoctest vidalmps
-julia> (2 + 3im) * vv;
+julia> (2 + 3im) * v_c;
 
-julia> ww = convert(VidalMPS, random_mps(s));
+julia> w_c = convert(VidalMPS, random_mps(s));
 
-julia> vv + 2ww;
+julia> v_c + 2w_c;
 
-```
-
-For inverse-canonical MPSs we define the scalar multiplication only when the
-number has unit absolute value.
-
-```jldoctest vidalmps
 julia> v_ic = convert(InverseCanonicalMPS, random_mps(s));
 
 julia> w_ic = convert(InverseCanonicalMPS, random_mps(s));
 
 julia> v_ic - im*w_ic;
 
-julia> 2v_ic
-ERROR: scalar factor multiplying the MPS does not have unit absolute value.
-[...]
 ```
 
 ITensor provides two algorithms to sum MPSs: the “direct sum”, and the “density
@@ -253,16 +257,18 @@ the original type.  The density-matrix approach is the default one, as it
 provides the most accurate results.
 
 ```jldoctest vidalmps
-julia> +(vv, ww; alg="directsum");
+julia> +(v_c, w_c; alg="directsum");
 
-julia> +(vv, ww; alg="densitymatrix");
+julia> +(v_c, w_c; alg="densitymatrix");
 
 ```
 
 !!! warning "Loss of the canonical gauge"
-    The result of the direct-sum addition algorithm, in general, doesn't satisfy
+    The result of the direct-sum addition algorithm, in general, won't satisfy
     the canonical gauge, i.e. \eqref{eq:vidalmps-cancellation-rules} and
-    \eqref{eq:icmps-cancellation-rules} don't hold anymore.
+    \eqref{eq:icmps-cancellation-rules} won't hold anymore. If you need an MPS
+    that satisfies the gauge conditions, consider using the `canonicalize`
+    function after the sum.
 
 ### Bond dimension truncation
 
@@ -273,7 +279,7 @@ decomposition.  This can be done by calling the `truncate` function (or its
 in-place version `truncate!`).
 
 ```jldoctest vidalmps
-julia> truncate!(vv; cutoff=1e-12, site_range=3:3);
+julia> truncate!(v_c; cutoff=1e-12, site_range=3:3);
 
 ```
 
@@ -282,8 +288,8 @@ a `site_range` argument which spans more than one bond.
 
 !!! info "Truncation order"
     When truncating multiple bonds, the operation is performed spanning the
-    range from right to left. This is to ensure consistency between the
-    `truncate` method for `VidalMPS`s and the ITensor implementation, so that
+    range from right to left. This is to ensure consistency between this
+    `truncate` method and the ITensor implementation, so that for example
     `truncate(v::MPS; ...) ≈ truncate(convert(VidalMPS, v); ...)` for the same
     `site_range`, `cutoff` and `maxdim` on both sides.
 
@@ -297,9 +303,9 @@ julia> Sx1 = op("Sx", s, 1);
 
 julia> Sy2Sy3 = op("Sy", s, 2) * op("Sy", s, 3);
 
-julia> apply(Sx1, vv);
+julia> apply(Sx1, v_c);
 
-julia> apply(Sy2Sy3, vv; cutoff=1e-14);
+julia> apply(Sy2Sy3, v_c; cutoff=1e-14);
 
 ```
 
@@ -318,20 +324,10 @@ satisfy the (inverse-) canonical gauge anymore.
 ### Inner products and expectation values
 
 The `inner` (or `dot`) function implements the inner product between two
-MPS, and the norm of an MPS can be retrieved with `norm`.  The `norm`
-function, in practice, doesn't compute the full inner product between a
-`VidalMPS` or an `InverseCanonicalMPS` and itself, but uses the cancellation
-rules in \eqref{eq:vidalmps-cancellation-rules} and
-\eqref{eq:icmps-cancellation-rules} to obtain the norm just by computing the
-trace of the square of the bond tensors:
+MPS, while the norm of an MPS can be retrieved with `norm`.
 
-```math
-\norm{\psi}^2 = \prod_{k=1}^{n-1} \tr(\Lambda^{(k)2}).
-```
-
-Expectation values of single-site operators can be computed via the `expect`
-function. For a detailed explanation of its options, see the documentation for
-the [`ITensorMPS.expect`](@extref) function.
-Thanks to the cancellation rules, the `expect` function, like `norm`, computes
-the result in an efficient way, by contracting only the sites affected by the
-operator.
+Expectation values of operators can be computed via the `expect` function. For a
+detailed explanation of its options, see the documentation for the
+[`ITensorMPS.expect`](@extref) function.  Thanks to the cancellation rules, the
+`expect` function computes the result in an efficient way, by contracting only
+the sites affected by the operator.

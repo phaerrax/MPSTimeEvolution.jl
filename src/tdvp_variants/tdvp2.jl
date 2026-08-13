@@ -295,7 +295,9 @@ function tdvp2!(solver, ψ::InverseCanonicalMPS, PH, dt, tmax; kwargs...)
     # evolution according to the operator exp(-tH), useful for thermalization processes.
     evol_dt = im * dt
     # Discard the imaginary part if time step is real.
-    imag(evol_dt) == 0 && (evol_dt = real(evol_dt))
+    # isreal(evol_dt) && (evol_dt = real(evol_dt))
+    isreal(evol_dt) &&
+        error("imaginary-time evolution not implemented for InverseCanonicalMPS")
 
     store_state0 && (ψ0 = copy(ψ))
 

@@ -43,63 +43,13 @@ function LinearAlgebra.dot(ψ1::MPST, ψ2::MPST)::Number where {MPST<:ExplicitBo
         x = (x * site_tensors(ψ1dag)[j]) * site_tensors(ψ2)[j]
     end
 
-    dot_ψ1_ψ2 = scalar(x)
+    dot_ψ1_ψ2 = norm(ψ1) * norm(ψ2) * scalar(x)
 
     if !isfinite(dot_ψ1_ψ2)
         @warn "The inner product (or norm²) you are computing is very large ($dot_ψ1_ψ2)."
     end
 
     return dot_ψ1_ψ2
-end
-
-function _simplified_norm_contraction(ψ::VidalMPS)
-    contr_post = prod(scalar(Λ*Λ) for Λ in bond_tensors(ψ)[2:end]; init=1.0)
-    return contr_post * norm(site_tensors(ψ)[1] * bond_tensors(ψ)[1])
-end
-
-function _simplified_norm_contraction(ψ::InverseCanonicalMPS)
-    contr_post = prod(scalar(inv.(V) * inv.(V)) for V in bond_tensors(ψ); init=1.0)
-    return contr_post * norm(site_tensors(ψ)[1])
-end
-
-"""
-    norm(ψ::VidalMPS)
-    norm(ψ::InverseCanonicalMPS)
-
-Compute the norm of the MPS, assuming that it satisfies the (inverse-) canonical gauge
-conditions.
-"""
-function LinearAlgebra.norm(
-    ψ::ExplicitBondMPS; neg_atol=eps(real(NDTensors.scalartype(ψ))) * 10
-)
-    rtol = eps(real(NDTensors.scalartype(ψ))) * 10
-    atol = rtol
-
-    norm2_ψ = _simplified_norm_contraction(ψ)
-
-    if !IsApprox.isreal(norm2_ψ, IsApprox.Approx(; rtol=rtol, atol=atol))
-        @warn "norm² is $norm2_ψ, which is not real up to a relative tolerance of " *
-            "$rtol and an absolute tolerance of $atol. Taking the real part, which " *
-            "may not be accurate."
-    end
-    norm2_ψ = real(norm2_ψ)
-
-    # Sometimes it happens that ⟨ψ, ψ⟩ is slightly below zero (~1e-16, always within
-    # numerical accuracy), likely because of some rounding inaccuracies.
-    # UGLY HACK: check whether ⟨ψ, ψ⟩ < 0 within some small error, and if so return zero,
-    # otherwise throw a genuine error.
-    if norm2_ψ < 0
-        if abs(norm2_ψ) < neg_atol
-            norm2_ψ = zero(norm2_ψ)
-        else
-            error(
-                "norm² is $norm2_ψ, which is negative beyond an absolute tolerance " *
-                "of $neg_atol.",
-            )
-        end
-    end
-
-    return sqrt(norm2_ψ)
 end
 
 ### Sums of MPSs
@@ -112,7 +62,9 @@ end
     add(A::InverseCanonicalMPS...; kwargs...)
 
 Add arbitrary numbers of (inverse-) canonical MPSs with each other, optionally truncating
-the results.
+the results.  Note that the `"directsum"` algorithm, in general, will yield an MPS which
+violates the (inverse-) canonical gauge.  If you need the properties of the canonical form,
+consider calling `canonicalise` to restore it after the operator is applied.
 
 A cutoff of 1e-15 is used by default, and in general users should set their own cutoff for
 their particular application.
@@ -127,10 +79,10 @@ function Base.:(+)(
 end
 
 function Base.:(+)(::Algorithm"directsum", ψs::MPST...) where {MPST<:ExplicitBondMPS}
-    # XXX The direct-sum algorithm, in general, yields an MPS which is not in the Vidal
-    # gauge (because orthonormality rules are not satisfied). The same likely happens in the
+    # The direct-sum algorithm, in general, yields an MPS which is not in the Vidal
+    # gauge (because orthonormality rules are not satisfied). The same happens in the
     # inverse canonical gauge as well.
-    # This is something that already happens at the level of standard MPSs:
+    # This is not really problematic, as it already happens at the level of standard MPSs:
     #
     #   julia> N = 10; s = siteinds("S=1/2", N);
     #
@@ -190,9 +142,15 @@ function Base.:(+)(::Algorithm"directsum", ψs::MPST...) where {MPST<:ExplicitBo
     sum_site_ts = Vector{ITensor}(undef, n)
     sum_bond_ts = Vector{ITensor}(undef, n-1)
 
+    # During the sum, we absorb each summand's norm into its own leftmost site tensor, so
+    # that the tensors we are summing contain the unnormalised sum of the states.  It
+    # doesn't matter if this doesn't preserve tr(Λ²)=1 for the resulting bond tensors,
+    # because — as noted above — the result of the direct sum is already known to violate
+    # the canonical gauge's cancellation rules in general.
+
     # First tensor of the direct sum:
     Γ₁, (r₁,) = directsum(
-        (site_tensors(ψᵢ)[1] => (rightlinkind(ψᵢ, 1),) for ψᵢ in ψs)...;
+        (norm(ψᵢ) * site_tensors(ψᵢ)[1] => (rightlinkind(ψᵢ, 1),) for ψᵢ in ψs)...;
         tags=[tags(rightlinkind(first(ψs), 1))],
     )
     # Γ₁ is the direct sum of the site_tensors(ψᵢ)[1]'s over the link indices: it will have
@@ -262,7 +220,11 @@ function Base.:(+)(::Algorithm"directsum", ψs::MPST...) where {MPST<:ExplicitBo
     Γₙ = replaceind(Γₙ, lₙ => dag(prev_link_inds))
     sum_site_ts[n] = Γₙ
 
-    return MPST(sum_site_ts, OffsetVector([ITensor(1.0); sum_bond_ts; ITensor(1.0)], 0:n))
+    return MPST(
+        sum_site_ts, OffsetVector([ITensor(1.0); sum_bond_ts; ITensor(1.0)], 0:n), 1.0
+    )
+    # The norm defaults to 1.0, which is correct since each ψᵢ's magnitude has already
+    # been folded into its tensors before the direct sum.
 end
 
 function Base.:(+)(
@@ -278,29 +240,16 @@ end
 
 ITensorMPS.add(ψs::ExplicitBondMPS...; kwargs...) = +(ψs...; kwargs...)
 
-function scalarmult!(ψ::VidalMPS, a::Number)
+function scalarmult!(ψ::ExplicitBondMPS, a::Number)
     # Multiplying the MPS by a is equivalent to multiplying one of its tensors by a.
-    # However, in order to preserve the Vidal form, the bond tensors must contain
-    # non-negative values only, and the site tensors have some orthogonality conditions to
-    # satisfy. Thus, we multiply the first of the bond tensors by |a| and the first site
-    # tensor by exp(i*arg(a)), which means that we multiply the vectors associated to the
-    # singular values (of the first bond tensor) by a unit complex number. This should be
-    # okay.
-    st = site_tensors(ψ)
-    bt = bond_tensors(ψ)
-    st[1] *= cis(angle(a))
-    bt[2] *= abs(a)
-    return ψ
-end
-
-function scalarmult!(ψ::InverseCanonicalMPS, a::Number)
-    # Still unclear how to do this if a is not a unit complex number, while preserving the
-    # inverse canonical form.
-    if abs(a) ≈ 1
-        site_tensors(ψ)[1] *= a
-    else
-        error("scalar factor multiplying the MPS does not have unit absolute value.")
-    end
+    # However, in order to preserve the Vidal form, the bond tensors must remain normalised,
+    # and the site tensors have some orthogonality conditions to satisfy. Thus, we multiply
+    # the MPS norm by |a| and the first site tensor by exp(i*arg(a)), which means that we
+    # multiply the vectors associated to the singular values (of the first bond tensor) by a
+    # unit complex number.
+    r, θ = abs(a), angle(a)
+    ψ.site_tensors[1] *= cis(θ)
+    ψ.norm *= r
     return ψ
 end
 
@@ -341,40 +290,20 @@ function Base.isapprox(
 end
 
 """
-    normalize!(ψ::VidalMPS)
+    normalize!(ψ::Union{VidalMPS,InverseCanonicalMPS})
+    normalize(ψ::Union{VidalMPS,InverseCanonicalMPS})
 
-Change the MPS `ψ` in-place such that `norm(ψ) ≈ 1`. This modifies the data of the bond
-tensors of the MPS.
-
-In practice, this renormalises the singular values in each bond tensor so that the sum of
-their squares is 1.
+Change the MPS `ψ` such that `norm(ψ) ≈ 1`. This does not modify the tensors of the MPS, but
+sets the norm field to 1.
 
 If the norm of the input MPS is 0, normalizing is ill-defined. In this case, we just return
 the original MPS.
 """
-function LinearAlgebra.normalize!(ψ::VidalMPS)
+function LinearAlgebra.normalize!(ψ::ExplicitBondMPS)
     if iszero(norm(ψ))
         return ψ
     end
-    for n in 1:(nsites(ψ) - 1)
-        bond_tensors(ψ)[n] /= sqrt(scalar(bond_tensors(ψ)[n] * bond_tensors(ψ)[n]))
-    end
-    return ψ
-end
-
-function LinearAlgebra.normalize!(ψ::InverseCanonicalMPS)
-    if iszero(norm(ψ))
-        return ψ
-    end
-    for n in 1:(nsites(ψ) - 1)
-        # A VidalMPS is renormalised by performing the substitution
-        #   Λⱼ ← 1/√tr(Λⱼ²) * Λⱼ;
-        # replacing Λⱼ by Vⱼ⁻¹ we obtain
-        #   Vⱼ ← √tr((Vⱼ⁻¹)²) * Vⱼ
-        bond_tensors(ψ)[n] *= sqrt(
-            scalar(inv.(bond_tensors(ψ)[n]) * inv.(bond_tensors(ψ)[n]))
-        )
-    end
+    ψ.norm = 1
     return ψ
 end
 

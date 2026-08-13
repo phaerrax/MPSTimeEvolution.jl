@@ -12,10 +12,10 @@ end
 _sf_translate_sites(n::Int) = 2n-1
 _sf_translate_sites_inv(n::Int) = div(n+1, 2)
 function _sf_translate_sites(op::LocalOperator)
-    LocalOperator(Dict(_sf_translate_sites(k) => v for (k, v) in op.terms))
+    return LocalOperator(Dict(_sf_translate_sites(k) => v for (k, v) in op.terms))
 end
 function _sf_translate_sites_inv(op::LocalOperator)
-    LocalOperator(Dict(_sf_translate_sites_inv(k) => v for (k, v) in op.terms))
+    return LocalOperator(Dict(_sf_translate_sites_inv(k) => v for (k, v) in op.terms))
 end
 
 """
@@ -75,7 +75,7 @@ sites(cb::SuperfermionCallback) = cb.sites
 expvalues(cb::SuperfermionCallback) = sort(cb.measurements)
 expvalues(cb::SuperfermionCallback, lop::LocalOperator) = cb.measurements[lop]
 function expvalues(cb::SuperfermionCallback, name::AbstractString)
-    expvalues(cb, LocalOperator(name))
+    return expvalues(cb, LocalOperator(name))
 end
 
 function Base.show(io::IO, cb::SuperfermionCallback)

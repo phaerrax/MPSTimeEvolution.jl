@@ -5,7 +5,7 @@ using ITensorMPS: position!, AbstractProjMPO, set_nsite!
 using MPSTimeEvolution: nsites, site_tensors, bond_tensors, TDVP2
 using KrylovKit: exponentiate
 
-# XXX We can't use the full MPS ψ here, because ψ is being modified by other processes while
+# We can't use the full MPS ψ here, because ψ is being modified by other processes while
 # this function is running. We need to break up the MPS in chunks and make each process
 # unaware of the chunks which aren't assigned to it.
 # We will need to `position!` an ProjMPO `PH` in order to move its “gap” on the correct
@@ -133,12 +133,13 @@ function shiftright!(
 end
 
 function invcanonical_decompose(M::ITensor, bond; linds, lefttags, righttags, kwargs...)
-    U, S, V = svd(M, linds...; lefttags=lefttags, righttags=righttags, kwargs...)
+    U, S, V, spectrum = svd(M, linds...; lefttags=lefttags, righttags=righttags, kwargs...)
+    S /= sqrt(scalar(S*S))
 
     # We assign U to the first site tensors within the segment that is being updated.
     # We will frequently multiply the tensors by delta(inds(S)): it is necessary in order to
     # correct the link indices.
-    return (U * S) * delta(inds(S)), inv.(S), (S * V) * delta(inds(S))
+    return (U * S) * delta(inds(S)), inv.(S), (S * V) * delta(inds(S)), spectrum.truncerr
 end
 
 function twositeupdate!(
@@ -156,7 +157,7 @@ function twositeupdate!(
     ltags = tags(commonind(site_ts[bond], bond_ts[bond]))
     rtags = tags(commonind(site_ts[bond + 1], bond_ts[bond]))
 
-    site_ts[bond], bond_ts[bond], site_ts[bond + 1] = invcanonical_decompose(
+    site_ts[bond], bond_ts[bond], site_ts[bond + 1], discarded_weight = invcanonical_decompose(
         updated_twositeblock,
         bond;
         linds=linds,
@@ -166,7 +167,7 @@ function twositeupdate!(
         righttags=rtags,
     )
 
-    return nothing
+    return discarded_weight
 end
 
 function twositeupdate(
@@ -228,7 +229,7 @@ function fullupdate!(
         !(sweepdir == "left" && bond == 1)
 
     # a) Forward two-site evolution
-    twositeupdate!(
+    discarded_weight = twositeupdate!(
         site_ts,
         bond_ts,
         PH,
@@ -244,57 +245,11 @@ function fullupdate!(
     next_site_n = sweepdir == "right" ? bond+1 : bond
     onesiteupdate!(site_ts, bond_ts, PH, next_site_n, -dt; current_time=current_time)
 
-    return nothing
-end
-
-# The `fullupdate!` function modifies `PH` in both cases, because it needs to be shifted
-# between the two individual updates.
-function fullupdate!(
-    Ψₗ::ITensor,
-    V::ITensor,
-    Ψᵣ::ITensor,
-    PH,
-    bond,
-    dt;
-    maxdim,
-    cutoff,
-    sweepdir,
-    current_time,
-)
-    # a) Forward two-site evolution
-    set_nsite!(PH, 2)
-    position!(PH, site_ts, bond_ts, bond)
-
-    Ψₗ, V, Ψᵣ = twositeupdate(
-        Ψₗ,
-        V,
-        Ψᵣ,
-        PH,
-        bond,
-        dt;
-        maxdim=maxdim,
-        cutoff=cutoff,
-        sweepdir=sweepdir,
-        current_time=current_time,
-    )
-
-    # b) Backward one-site evolution on the next site
-    set_nsite!(PH, 1)
-    position!(PH, site_ts, bond_ts, bond)
-
-    if sweepdir == "right"
-        Ψᵣ = onesiteupdate(Ψᵣ, PH, -dt; current_time=current_time)
-    elseif sweepdir == "left"
-        Ψₗ = onesiteupdate(Ψₖ, PH, -dt; current_time=current_time)
-    else
-        error("sweepdir is neither \"left\" nor \"right\".")
-    end
-
-    return Ψₗ, V, Ψᵣ
+    return discarded_weight
 end
 
 function partsweep_start_msg(partn, site_range, current_time)
-    string(
+    return string(
         "[Partition $partn] Site range: ",
         first(site_range),
         " to ",

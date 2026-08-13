@@ -14,6 +14,8 @@ function tdvp2_parallel_sweep_4p!(
 )
     site_range = eachindex(site_ts)
 
+    truncerr = 0.0
+
     # • Ψₗ ⟵  partition’s rightmost site tensor
     bond = last(site_range)
     Ψₗ = site_ts[bond]
@@ -47,7 +49,7 @@ function tdvp2_parallel_sweep_4p!(
     MPI.send(PH.LR[1:(bond - 1)], comm; dest=2, tag=intcode("betaL"))
 
     # • Perform a two-site update across the partition border.
-    Ψₗ, V, Ψᵣ = twositeupdate(
+    Ψₗ, V, Ψᵣ, discarded_weight = twositeupdate(
         Ψₗ,
         V,
         Ψᵣ,
@@ -59,6 +61,7 @@ function tdvp2_parallel_sweep_4p!(
         sweepdir="left",
         current_time=current_time+0.5dt,
     )
+    truncerr += discarded_weight
 
     # • Send Ψₗ, V, and Ψᵣ to process 3
     MPI.send(Ψₗ, comm; dest=2, tag=intcode("PsiL"))
@@ -87,7 +90,7 @@ function tdvp2_parallel_sweep_4p!(
     # • Repeat ... until Ψₗ is the partition’s leftmost site tensor
     while true
         bond -= 1
-        fullupdate!(
+        discarded_weight = fullupdate!(
             site_ts,
             bond_ts,
             PH,
@@ -98,6 +101,8 @@ function tdvp2_parallel_sweep_4p!(
             sweepdir="left",
             current_time=current_time+0.5dt,
         )
+        truncerr += discarded_weight
+
         bond == first(site_range) && break
     end
     @assert bond == first(site_range)
@@ -160,7 +165,7 @@ function tdvp2_parallel_sweep_4p!(
         # Ψₗ ⟵  Ψᵣ
         # Ψᵣ ⟵  site tensor to the right of Ψₗ
         # Perform full two-site update
-        fullupdate!(
+        discarded_weight = fullupdate!(
             site_ts,
             bond_ts,
             PH,
@@ -171,6 +176,8 @@ function tdvp2_parallel_sweep_4p!(
             sweepdir="right",
             current_time=current_time+dt,
         )
+        truncerr += discarded_weight
+
         bond+1 == last(site_range) && break
     end
     @assert bond+1 == last(site_range)
@@ -208,7 +215,7 @@ function tdvp2_parallel_sweep_4p!(
     PH.LR[(bond + 2):end] .= γᵣ
 
     # • Perform two-site update
-    Ψₗ, V, Ψᵣ = twositeupdate(
+    Ψₗ, V, Ψᵣ, discarded_weight = twositeupdate(
         Ψₗ,
         V,
         Ψᵣ,
@@ -220,6 +227,7 @@ function tdvp2_parallel_sweep_4p!(
         sweepdir="right",
         current_time=current_time+dt,
     )
+    truncerr += discarded_weight
 
     # • Send Ψₗ , V, and Ψᵣ to process 3
     MPI.send(Ψₗ, comm; dest=2, tag=intcode("PsiL"))
@@ -234,5 +242,5 @@ function tdvp2_parallel_sweep_4p!(
     set_nsite!(PH, 1)
     shiftleft!(PH, Ψᵣ, V)
 
-    return site_ts, bond_ts, PH
+    return site_ts, bond_ts, PH, truncerr
 end

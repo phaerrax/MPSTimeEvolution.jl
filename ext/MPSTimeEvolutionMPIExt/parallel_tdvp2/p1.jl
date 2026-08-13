@@ -14,6 +14,8 @@ function tdvp2_parallel_sweep_4p!(
 )
     site_range = eachindex(site_ts)
 
+    truncerr = 0.0
+
     # • Ψᵣ ⟵  partition’s leftmost site tensor
     bond = first(site_range)-1
     @assert bond == 0
@@ -26,7 +28,7 @@ function tdvp2_parallel_sweep_4p!(
 
         # • Perform two-site update on (Ψₗ,Ψᵣ)
         # • Update Ψᵣ, and the environment blocks in PH (create βᵣ, discard γᵣ)
-        fullupdate!(
+        discarded_weight = fullupdate!(
             site_ts,
             bond_ts,
             PH,
@@ -37,6 +39,7 @@ function tdvp2_parallel_sweep_4p!(
             sweepdir="right",
             current_time=current_time + 0.5dt,
         )
+        truncerr += discarded_weight
 
         bond+1 == last(site_range) && break
     end
@@ -77,7 +80,7 @@ function tdvp2_parallel_sweep_4p!(
     # then we send it back to process 2 and forget about it.
 
     # • Evolve Ψₗ, V, Ψᵣ forwards by dt.
-    Ψₗ, V, Ψᵣ = twositeupdate(
+    Ψₗ, V, Ψᵣ, discarded_weight = twositeupdate(
         Ψₗ,
         V,
         Ψᵣ,
@@ -89,6 +92,7 @@ function tdvp2_parallel_sweep_4p!(
         sweepdir="right",
         current_time=current_time + 0.5dt,
     )
+    truncerr = + discarded_weight
 
     # • Send Ψₗ, V, and Ψᵣ to process 2
     MPI.send(Ψₗ, comm; dest=1, tag=intcode("PsiL"))
@@ -121,7 +125,7 @@ function tdvp2_parallel_sweep_4p!(
         # a) Forward two-site evolution on (bond, bond+1).
         set_nsite!(PH, 2)
         position!(PH, site_ts, bond_ts, bond)
-        twositeupdate!(
+        discarded_weight = twositeupdate!(
             site_ts,
             bond_ts,
             PH,
@@ -132,6 +136,7 @@ function tdvp2_parallel_sweep_4p!(
             sweepdir="left",
             current_time=current_time+dt,
         )
+        truncerr += discarded_weight
 
         bond == first(site_range) && break
 
@@ -143,5 +148,5 @@ function tdvp2_parallel_sweep_4p!(
     end
     @assert bond == first(site_range)
 
-    return site_ts, bond_ts, PH
+    return site_ts, bond_ts, PH, truncerr
 end

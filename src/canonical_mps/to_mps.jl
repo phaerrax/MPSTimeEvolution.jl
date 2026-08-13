@@ -31,7 +31,9 @@ function Base.convert(::Type{MPS}, ψ::VidalMPS; ortho_center=1)
     for n in 2:N
         M[n] *= delta(old_link_inds[n - 1], new_link_inds[n - 1])
     end
-    return MPS(M; ortho_lims=ortho_center:ortho_center)
+
+    # Finally absorb the norm into the resulting MPS.
+    return norm(ψ)*MPS(M; ortho_lims=ortho_center:ortho_center)
 end
 
 # MPS to VidalMPS: orthogonalise the MPS first, then use the SVD to separate the bond
@@ -48,26 +50,7 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; kwargs...)
     # `orthogonalize` would be enough to create a copy of the original MPS, but apparently
     # it is not enough.)
 
-    # I don't really know why, but the MPS needs to be normalised for the conversion
-    # function to produce a correctly canonicalised MPS. Probably it's because once we
-    # extract the bond tensor Λₖ, we also reincorporate it into the site tensor to its right
-    # before we continue the SVD on the next bond, i.e. with
-    #   M = bond_ts[n - 1] * V * ψ[n]
-    # so the norm gets propagated on all bonds.
-    # This (silently) creates all sorts of errors, and most importantly breaks the gauge.
-    # For example, we get
-    #   norm(2v) !≈ norm(convert(VidalMPS, 2v))
-    # while, correctly,
-    #   norm(2v) ≈ norm(2 * convert(VidalMPS, v))
-    # although quite surprisingly we still have
-    #   2 * convert(VidalMPS, v) ≈ convert(VidalMPS, 2v)
-    # which likely signals that the problem lies in the broken canonical gauge, whose
-    # properties are used by the norm function.
-
-    # TODO Maybe we need to rethink the conversion routine? This was taken from Schollwöck,
-    # but he assumes the MPS represents a pure state so he doesn't have to worry about a
-    # norm which is not one.
-    # Anyway, we extract the norm and normalise the MPS, then we'll reintegrate the norm at
+    # We extract the norm and normalise the MPS, then we'll reintegrate the norm at
     # the end of the procedure with our `scalarmult` function.
     norm_ψ = norm(ψ)
     normalize!(ψ)
@@ -115,10 +98,10 @@ function Base.convert(::Type{VidalMPS}, ψ::MPS; kwargs...)
     # site_ts[N] = inv.(bond_ts[N-1]) * M = inv.(bond_ts[N-1]) * bond_ts[N-1] * V * ψ[N]
     site_ts[N] = V * ψ[N]
 
-    # Add the trivial bond tensors at the edges of the MPS, put the norm back into the MPS,
-    # and return.
-    return norm_ψ *
-           VidalMPS(site_ts, OffsetVector([ITensor(1.0); bond_ts; ITensor(1.0)], 0:N))
+    # Add the trivial bond tensors at the edges of the MPS, put the norm back into the MPS.
+    return VidalMPS(
+        site_ts, OffsetVector([ITensor(1.0); bond_ts; ITensor(1.0)], 0:N), norm_ψ
+    )
 end
 
 # InverseCanonicalMPS to MPS: contract Cₖ and Vₖ to get Aₖ, and contract Vₖ and Cₖ₊₁ to
@@ -152,7 +135,8 @@ function Base.convert(::Type{MPS}, ψ::InverseCanonicalMPS; ortho_center=1)
     for n in 2:N
         M[n] *= delta(old_link_inds[n - 1], new_link_inds[n - 1])
     end
-    return MPS(M; ortho_lims=ortho_center:ortho_center)
+
+    return norm(ψ) * MPS(M; ortho_lims=ortho_center:ortho_center)
 end
 
 # MPS to InverseCanonicalMPS: orthogonalise the MPS first, then use the SVD to separate the
@@ -233,7 +217,7 @@ function Base.convert(::Type{InverseCanonicalMPS}, ψ::VidalMPS)
         ic_site_ts[n] *= delta(old_llink_inds[n - 1], new_llink_inds[n - 1])
     end
 
-    return InverseCanonicalMPS(ic_site_ts, ic_bond_ts)
+    return InverseCanonicalMPS(ic_site_ts, ic_bond_ts, norm(ψ))
 end
 
 # InverseCanonicalMPS to VidalMPS: Λₖ = Vₖ⁻¹, and
@@ -252,5 +236,5 @@ function Base.convert(::Type{VidalMPS}, ψ::InverseCanonicalMPS)
     ]
     c_bond_ts = [inv.(Vⱼ) for Vⱼ in V]
 
-    return VidalMPS(c_site_ts, c_bond_ts)
+    return VidalMPS(c_site_ts, c_bond_ts, norm(ψ))
 end

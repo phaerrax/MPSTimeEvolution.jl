@@ -5,7 +5,8 @@
     truncate!(ψ::InverseCanonicalMPS; kwargs...)
 
 Perform a truncation of all bonds of the MPS using the truncation parameters (`cutoff`,
-`maxdim`, etc.) provided as keyword arguments.
+`maxdim`, etc.) provided as keyword arguments. This operation leaves the singular values on
+the bond tensors normalised, and reduces the MPS norm according to the discarded weight.
 
 Keyword arguments:
 
@@ -69,21 +70,22 @@ function ITensorMPS.truncate!(
         ltags = tags(commonind(bond_ts[j - 1], site_ts[j]))  # = "Link,l=j"
         rtags = tags(commonind(site_ts[j - 1], bond_ts[j - 1]))  # = "Link,r=j-1"
 
-        U, bond_ts[j - 1], V, spec = svd(
-            M, linds; lefttags=ltags, righttags=rtags, kwargs...
-        )
+        U, S, V, spectrum = svd(M, linds; lefttags=ltags, righttags=rtags, kwargs...)
         #               sⱼ₋₁                 sⱼ
         #      │   rⱼ₋₂   │ rⱼ₋₁         lⱼ  │   lⱼ₊₁  │
         #  ╶╶╶─○──────────V───────Λⱼ₋₁───────U─────────○─╶╶
         #
         # The  `lefttags` are assigned to the Λⱼ₋₁──U bond, while the `righttags` to the
         # V──Λⱼ₋₁ one.
+        S /= sqrt(scalar(S*S))
+        ψ.norm *= sqrt(1 - spectrum.truncerr)
 
-        callback(; link=(j => j - 1), truncation_error=spec.truncerr)
+        callback(; link=(j => j - 1), truncation_error=spectrum.truncerr)
 
         # Restore the Vidal form by "removing" the singular values we previously
         # incorporated.
         site_ts[j] = inv.(bond_ts[j]) * U
+        bond_ts[j - 1] = S
         site_ts[j - 1] = V * inv.(bond_ts[j - 2])
     end
 
@@ -133,15 +135,17 @@ function ITensorMPS.truncate!(
         ltags = tags(commonind(bond_ts[j - 1], site_ts[j]))  # = "Link,l=j"
         rtags = tags(commonind(site_ts[j - 1], bond_ts[j - 1]))  # = "Link,r=j-1"
 
-        U, S, W, spec = svd(M, linds; lefttags=ltags, righttags=rtags, kwargs...)
+        U, S, W, spectrum = svd(M, linds; lefttags=ltags, righttags=rtags, kwargs...)
         #              sⱼ₋₁              sⱼ
         #         lⱼ₋₁   │ rⱼ₋₁      lⱼ  │  rⱼ 
         #  ╶╶╶─◇─────────W───────S───────U──────◇──╶╶
         #
         # The  `lefttags` are assigned to the S──U bond, while the `righttags` to the
         # W──S one.
+        S /= sqrt(scalar(S*S))
+        ψ.norm *= sqrt(1 - spectrum.truncerr)
 
-        callback(; link=(j => j - 1), truncation_error=spec.truncerr)
+        callback(; link=(j => j - 1), truncation_error=spectrum.truncerr)
 
         # Restore the inverse canonical form (use deltas to restore the index structure).
         site_ts[j - 1] = (W * S) * delta(inds(S))

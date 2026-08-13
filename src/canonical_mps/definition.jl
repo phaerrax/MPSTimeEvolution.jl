@@ -13,28 +13,50 @@ mutable struct VidalMPS <: ExplicitBondMPS
     #
     site_tensors::Vector{ITensor}
     bond_tensors::OffsetVector{ITensor}
-    # The `bond_tensors` member is an OffsetVector because we want to add trivial bond
-    # tensors at the edges of the MPS (this simplifies the logic in some functions a lot),
-    # while at the same time preserving the "natural" indexing of the actual bond tensors
-    # from 1 to N-1.
-    # For the trivial bond tensors we will use ITensor(1.0), and not e.g. OneITensor(),
-    # because we need to call `inv.` on it, and there's no such method for OneITensors.
-    # There are no actual indices linking these trivial bond tensors to the adjacent site
-    # tensors.
+    # In order to make the logic in most functions simpler, we add two additional dummy bond
+    # tensors at the edges of the MPS: one at the left of the "real" first one, and one to
+    # the right of the "real" last one.  For the trivial bond tensors we use ITensor(1.0),
+    # and not e.g. OneITensor(), because we need to call `inv.` on it, and there's no such
+    # method for OneITensors.  Moreover, there are no actual indices linking these trivial
+    # bond tensors to the adjacent site tensors, so any index operation (contraction,
+    # computing common indices, etc... I think) involving these tensors does not actually do
+    # anything.
+    # This allows us for example to iterate with something like `k in
+    # eachindex(site_tensors)` and still be able to call `bond_tensors[k-1]` and
+    # `bond_tensors[k+1]` for all k's without triggering errors.  In order to preserve the
+    # "natural" indexing of the actual bond tensors from 1 to N-1, we use an OffsetVector to
+    # store the bond tensors, storing the dummy ones in  `bond_tensors[0]` and
+    # `bond_tensors[N]`.
+    norm::Float64
+    # For a canonical Vidal MPS there is (or seems to be) no way of absorbing an arbitrary
+    # (complex) number into the state while keeping all bond tensors normalised to one. In
+    # order to be able to represent vectors with arbitrary norm, we have two choices.
+    # 1. "Park" the norm into a specific bond tensor, relaxing the convention that every
+    #    bond tensor is normalised. This is very practical but it's fragile, because every
+    #    function assuming the canonical gauge condition must then be aware of this
+    #    convention, and it's easy to overlook something.
+    # 2. Store the norm in a separate field and keep all bond tensors normalised. This is a
+    #    clearer (and probably more robust) choice, as it's clear where the norm resides.
+    # How should the norm be initialised?
+    # *  If the MPS is completely empty, that is, it has no tensors, then its norm is 1.
+    #    Basically we are saying that an empty tensor network contracts to 1, just as the
+    #    result of an empty product is 1. Moreover, this way an empty MPS is (correctly) a
+    #    multiplicative identity for the tensor product.
+    # *  If the MPS contains a non-empty list of empty tensors, we set its norm to zero,
+    #    consistently with the fact that `norm(t)` is zero if `t` is an empty ITensor.
+    #    Moreover, such an MPS could be added to another MPS of similar shape, and in this
+    #    case it should act as an identity for the addition.
+    # *  Genuine, non-empty product states are always a specific basis element, therefore
+    #    their norm is 1.
 
-    function VidalMPS(site_tensors::Vector{ITensor}, bond_tensors::OffsetVector{ITensor})
+    function VidalMPS(
+        site_tensors::Vector{ITensor}, bond_tensors::OffsetVector{ITensor}, norm
+    )
         # This constructor seems pretty useless, but we need to define it otherwise Julia
-        # automatically defined a default constructor
-        #   VidalMPS(site_tensors, bond_tensors)
-        # with no type annotations. This constructor would be in conflict with some of the
-        # methods below, for example the
-        #   VidalMPS(sites::Vector{<:Index}, states_)
-        # constructor. After calling something like VidalMPS(s, "Up") we'd get the following
-        # error:
-        #   MethodError: VidalMPS(::Vector{Index{Int64}}, ::String) is ambiguous.
-        # By defining this constructor, there is no 2-argument VidalMPS function whose
-        # second argument is ::Any, so the call is not ambiguous anymore.
-        return new(site_tensors, bond_tensors)
+        # would automatically define a default constructor
+        #   VidalMPS(site_tensors, bond_tensors, norm)
+        # with no type annotations, which might conflict with some of the methods below.
+        return new(site_tensors, bond_tensors, norm)
     end
 end
 
@@ -48,25 +70,27 @@ mutable struct InverseCanonicalMPS <: ExplicitBondMPS
     # is intended to be a vertically reflected Λ, which is nice. However Ψ feels too “heavy”
     # to be used so much throughout the code, so we'll use C to denote site tensors in
     # drawings.
-    # We add trivial bond tensors at the edges of the MPS (for the same reason we use them
-    # in the VidalMPS type).
+    # This struct is designed analogously to the VidalMPS type above.
     site_tensors::Vector{ITensor}
     bond_tensors::OffsetVector{ITensor}
+    norm::Float64
 
     function InverseCanonicalMPS(
-        site_tensors::Vector{ITensor}, bond_tensors::OffsetVector{ITensor}
+        site_tensors::Vector{ITensor}, bond_tensors::OffsetVector{ITensor}, norm
     )
-        return new(site_tensors, bond_tensors)
+        return new(site_tensors, bond_tensors, norm)
     end
 end
 
 site_tensors(ψ::ExplicitBondMPS) = ψ.site_tensors
 bond_tensors(ψ::ExplicitBondMPS) = ψ.bond_tensors
+LinearAlgebra.norm(ψ::ExplicitBondMPS) = ψ.norm
 
 Base.length(ψ::ExplicitBondMPS) = length(site_tensors(ψ)) + length(bond_tensors(ψ))
-# `length` here should be considered as an internal function that shouldn't really be called
-# by end users; it has beed added because it is required by some iterators. Consider using
-# `nsites` instead.
+Base.keys(ψ::ExplicitBondMPS) = 1:length(ψ)
+# `length` and `keys` here should be considered as internal functions, that shouldn't really
+# be called by end users; they were added because they were required by some iterators.
+# Consider using `nsites` instead.
 
 nsites(ψ::ExplicitBondMPS) = length(site_tensors(ψ))
 
@@ -87,27 +111,40 @@ function Base.iterate(ψ::ExplicitBondMPS, state)
     end
 end
 
-Base.keys(ψ::ExplicitBondMPS) = 1:length(ψ)
-
 ### Constructors
 # (carried over from the MPS type from ITensorMPS)
 
 # Empty MPSs with no sites.
-VidalMPS() = VidalMPS(ITensor[], OffsetVector(ITensor[]))
-InverseCanonicalMPS() = InverseCanonicalMPS(ITensor[], OffsetVector(ITensor[]))
+VidalMPS() = VidalMPS(ITensor[], OffsetVector(ITensor[]), 1.0)
+InverseCanonicalMPS() = InverseCanonicalMPS(ITensor[], OffsetVector(ITensor[]), 1.0)
 
+### Type-parametric functions
 # The following syntax is equivalent to defining two functions, 
 #   function VidalMPS(N::Int)
 #   function InverseCanonicalMPS(N::Int)
-# with `MPST` inside of them replaced by either `VidalMPS` or `InverseCanonicalMPS`
-# depending on which version is called.
+# at once, with `MPST` inside of them replaced by either `VidalMPS` or `InverseCanonicalMPS`
+# depending on which version is called. There are many functions like this in this package:
+# this syntax is necessary because by declaring the function as
+#   function f(x::MPST) where {MPST<:ExplicitBondMPS}
+#       ...
+#   end
+# we can then call `MPST` within the function body to get the actual type the function is
+# compiled with, either VidalMPS or InverseCanonicalMPSs. This would not be possible if we
+# just wrote
+#   function f(x::ExplicitBondMPS)
+#       ...
+#   end
+# (The following is a very particular instance of this syntax where the MPST type parameter
+# is in the function name itself.)
 function (::Type{MPST})(N::Int) where {MPST<:ExplicitBondMPS}
     # Construct a VidalMPS or an InverseCanonicalMPS with N sites, with default-constructed
     # ITensors.
     #
     # Beware that N is the number of the site tensors.
     # (This is a default constructor that is not meant to be called directly.)
-    return MPST(Vector{ITensor}(undef, N), OffsetVector(Vector{ITensor}(undef, N+1), 0:N))
+    return MPST(
+        Vector{ITensor}(undef, N), OffsetVector(Vector{ITensor}(undef, N+1), 0:N), 0.0
+    )
 end
 
 """
@@ -145,13 +182,13 @@ function (::Type{MPST})(
     end
     bond_tensors[N] = ITensor(1.0)
 
-    return MPST(site_tensors, bond_tensors)
+    return MPST(site_tensors, bond_tensors, 0.0)
 end
 
 function (::Type{MPST})(
     sites::Vector{<:Index}, args...; kwargs...
 ) where {MPST<:ExplicitBondMPS}
-    MPST(Float64, sites, args...; kwargs...)
+    return MPST(Float64, sites, args...; kwargs...)
 end
 
 """
@@ -221,6 +258,7 @@ function (::Type{MPST})(
         OffsetVector(
             convert_leaf_eltype(eltype, [ITensor(1.0); bond_ts; ITensor(1.0)]), 0:N
         ),
+        1.0,
     )
 end
 
@@ -256,7 +294,7 @@ psi = VidalMPS(sites, states)
 ```
 """
 function (::Type{MPST})(sites::Vector{<:Index}, states) where {MPST<:ExplicitBondMPS}
-    MPST(Float64, sites, states)
+    return MPST(Float64, sites, states)
 end
 
 """
@@ -273,11 +311,11 @@ modifying the data of the returned MPS will modify the input MPS.
 Use [`deepcopy`](@ref) for an alternative that copies the ITensors as well.
 """
 function Base.copy(ψ::MPST) where {MPST<:ExplicitBondMPS}
-    MPST(copy(site_tensors(ψ)), copy(bond_tensors(ψ)))
+    return MPST(copy(site_tensors(ψ)), copy(bond_tensors(ψ)), norm(ψ))
 end
 
 function Base.similar(ψ::MPST) where {MPST<:ExplicitBondMPS}
-    MPST(similar(site_tensors(ψ)), similar(bond_tensors(ψ)))
+    return MPST(similar(site_tensors(ψ)), similar(bond_tensors(ψ)), NaN)
 end
 
 """
@@ -293,7 +331,7 @@ Use [`copy`](@ref) for an alternative that performs a shallow copy that avoids c
 ITensor data.
 """
 function ITensorMPS.deepcopy(ψ::MPST) where {MPST<:ExplicitBondMPS}
-    MPST(copy.(site_tensors(ψ)), copy.(bond_tensors(ψ)))
+    return MPST(copy.(site_tensors(ψ)), copy.(bond_tensors(ψ)), norm(ψ))
 end
 
 function LinearAlgebra.promote_leaf_eltypes(ψ::ExplicitBondMPS)
@@ -331,7 +369,7 @@ function Base.show(io::IO, ::MIME"text/plain", ψ::ExplicitBondMPS)
     return nothing
 end
 
-function check_vidal_form(ψ::VidalMPS; verbose=true)
+function check_vidal_form(ψ::VidalMPS; verbose=true, kwargs...)
     N = nsites(ψ)
 
     ψdag = sim(linkinds, dag(ψ))
@@ -342,14 +380,17 @@ function check_vidal_form(ψ::VidalMPS; verbose=true)
 
     errors = String[]
 
-    # Check whether the singular values are real and not negative (excluding the trivial
-    # bond tensors at the edges).
+    # Check whether the singular values are real, not negative (excluding the trivial
+    # bond tensors at the edges), and the sum of their squares is 1.
     for (j, Λ) in enumerate(bt[1:(N - 1)])
         if any(!isreal, diag(Λ))
             push!(errors, "non-real singular values on bond $j")
         end
         if any(<(0), diag(Λ))
             push!(errors, "negative singular values on bond $j")
+        end
+        if !isapprox(scalar(Λ * Λ), 1; kwargs...)
+            push!(errors, "bond tensor $j not normalised")
         end
     end
 
@@ -373,16 +414,16 @@ function check_vidal_form(ψ::VidalMPS; verbose=true)
         # Everything works even if j = N: then bt[N] * btdag[N] == ITensor(1.0), and
         # delta(commoninds(Mⱼ, bt[j] * btdag[j])) becomes a unit tensor, which does nothing
         # to Mⱼ.
-        if !isapprox(ITensors.matrix(Mⱼ), scalar(bt[j] * bt[j]) * I)
+        if !isapprox(ITensors.matrix(Mⱼ), I; kwargs...)
             push!(errors, "right-orthonormality condition not satisfied on site $j")
         end
     end
 
-    #  ╭───Λ[j-1]───Γ[j]───                       ╭───
-    #  │             │                            │
-    #  │             │        =  tr(Λ[j-1]²)  ×   │
-    #  │             │                            │
-    #  ╰───Λ[j-1]───Γ[j]───                       ╰───
+    #  ╭───Λ[j-1]───Γ[j]───                       ╭───       ╭───
+    #  │             │                            │          │
+    #  │             │        =  tr(Λ[j-1]²)  ×   │      =   │
+    #  │             │                            │          │
+    #  ╰───Λ[j-1]───Γ[j]───                       ╰───       ╰───
     #
     #   Γ[1]───       ╭───
     #    │            │
@@ -393,7 +434,7 @@ function check_vidal_form(ψ::VidalMPS; verbose=true)
     for j in 1:(N - 1)
         Mⱼ = bt[j - 1] * st[j] * btdag[j - 1] * stdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, bt[j - 1] * btdag[j - 1]))
-        if !isapprox(ITensors.matrix(Mⱼ), scalar(bt[j - 1] * bt[j - 1]) * I)
+        if !isapprox(ITensors.matrix(Mⱼ), I; kwargs...)
             push!(errors, "left-orthonormality condition not satisfied on site $j")
         end
     end
@@ -429,15 +470,18 @@ function check_inverse_canonical_form(ψ::InverseCanonicalMPS; verbose=true, kwa
         if any(<(0), diag(V))
             push!(errors, "negative singular values on bond $j")
         end
+        if !isapprox(scalar(inv.(V) * inv.(V)), 1; kwargs...)
+            push!(errors, "bond tensor $j not normalised")
+        end
     end
 
     # Check whether the cancellation rules hold.
 
-    #  ╭───C[j]───V[j]───      ╭───Λ[j-1]───Γ[j]───                       ╭───
-    #  │    │                  │             │                            │
-    #  │    │               =  │             │        =  tr(Λ[j-1]²)  ×   │
-    #  │    │                  │             │                            │
-    #  ╰───C[j]───V[j]───      ╰───Λ[j-1]───Γ[j]───                       ╰───
+    #  ╭───C[j]───V[j]───     ╭───Λ[j-1]───Γ[j]───                    ╭───       ╭───
+    #  │    │                 │             │                         │          │
+    #  │    │              =  │             │       =  tr(Λ[j-1]²) ×  │      =   │
+    #  │    │                 │             │                         │          │
+    #  ╰───C[j]───V[j]───     ╰───Λ[j-1]───Γ[j]───                    ╰───       ╰───
 
     #   C[1]───V[1]───       Γ[j]───       ╭───
     #    │                    │            │
@@ -448,21 +492,16 @@ function check_inverse_canonical_form(ψ::InverseCanonicalMPS; verbose=true, kwa
     for j in 1:(N - 1)
         Mⱼ = st[j] * bt[j] * stdag[j] * btdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, st[j] * stdag[j]))
-        λ = scalar(inv.(bt[j - 1]) * inv.(bt[j - 1]))
-        if !isapprox(ITensors.matrix(Mⱼ), λ * I; kwargs...)
-            push!(
-                errors,
-                "left-orthonormality condition not satisfied on site $j: " *
-                "‖Mⱼ - λI‖ = $(norm(ITensors.matrix(Mⱼ) - λ * I))",
-            )
+        if !isapprox(ITensors.matrix(Mⱼ), I; kwargs...)
+            push!(errors, "left-orthonormality condition not satisfied on site $j")
         end
     end
 
-    #   ───V[j-1]───C[j]───╮       ───Γ[j]───Λ[j]───╮                     ───╮
-    #                │     │           │            │                        │
-    #                │     │   =       │            │   =  tr(Λ[j]²)  ×      │
-    #                │     │           │            │                        │
-    #   ───V[j-1]───C[j]───╯       ───Γ[j]───Λ[j]───╯                     ───╯
+    #   ───V[j-1]───C[j]───╮       ───Γ[j]───Λ[j]───╮                     ───╮       ───╮
+    #                │     │           │            │                        │          │
+    #                │     │   =       │            │   =  tr(Λ[j]²)  ×      │   =      │
+    #                │     │           │            │                        │          │
+    #   ───V[j-1]───C[j]───╯       ───Γ[j]───Λ[j]───╯                     ───╯       ───╯
 
     #   ───V[N-1]───C[N]        ───Γ[N]       ───╮
     #                │              │            │
@@ -473,13 +512,8 @@ function check_inverse_canonical_form(ψ::InverseCanonicalMPS; verbose=true, kwa
     for j in 2:N
         Mⱼ = bt[j - 1] * st[j] * btdag[j - 1] * stdag[j]
         Mⱼ = Mⱼ * delta(commoninds(Mⱼ, st[j] * stdag[j]))
-        λ = scalar(inv.(bt[j]) * inv.(bt[j]))
-        if !isapprox(ITensors.matrix(Mⱼ), λ * I; kwargs...)
-            push!(
-                errors,
-                "right-orthonormality condition not satisfied on site $j: " *
-                "‖Mⱼ - λI‖ = $(norm(ITensors.matrix(Mⱼ) - λ * I))",
-            )
+        if !isapprox(ITensors.matrix(Mⱼ), I; kwargs...)
+            push!(errors, "right-orthonormality condition not satisfied on site $j")
         end
     end
 
@@ -514,7 +548,7 @@ function canonicalize(ψ::MPST; kwargs...) where {MPST<:ExplicitBondMPS}
     #    broken and the ‖ψ‖ - 1 discrepancy will come back to bite us in the IC gauge check
     #    function.
     ψ_mps = convert(MPS, ψ)
-    normalize!(ψ_mps)
+    normalize!(ψ_mps) # TODO
     # 2. The resulting MPS might not be a valid state, if the original ψ did not respect its
     #    gauge. However, we can fix the MPS easily by re-orthogonalising it (we
     #    orthogonalise it on the last site, but I think we can choose whatever site we

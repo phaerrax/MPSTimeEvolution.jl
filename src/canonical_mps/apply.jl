@@ -1,17 +1,25 @@
 function replace_and_decompose!(ψ::VidalMPS, M::ITensor; kwargs...)
     # Replace the sites of the Vidal MPS `ψ` with the tensor `A`, splitting up `A` into MPS
-    # tensors. THE TENSORS TO BE REPLACED ARE AUTOMATICALLY DETERMINED BY A'S SITE INDICES.
+    # tensors. This is an internal function --- use `apply` instead to compute an
+    # ITensor/VidalMPS product. If M covers more sites, then one or more SVDs are applied,
+    # and the singular values are renormalised as necessary. However, no assumptions about
+    # the canonical form are made: we don't check if the resulting MPS is still canonical.
+    # THE TENSORS TO BE REPLACED ARE AUTOMATICALLY DETERMINED BY A'S SITE INDICES.
     # THIS FUNCTION DOESN'T TAKE INTO ACCOUNT THE BOND TENSORS ON THE LEFT AND ON THE RIGHT
     # OF A. KEEP THIS IN MIND WHEN USING THIS FUNCTION WHEN APPLYING MULTI-SITE OPERATORS.
 
     # The ITensor A will have some site indices. We need to factor it into an MPS-like form,
     # with a different site block for each site index.
-
     # 1. Get the site indices involved in the decomposition, and sort them by increasing
-    #    site number.
+    #    site number. Throw an error if the site indices are not consecutive: this case is
+    #    not yet supported.
     ns = findsites(ψ, M)
     sort!(ns)
     N = length(ns)
+
+    if any(!=(1), diff(ns))
+        error("replace_and_decompose!: non-consecutive application sites are not supported")
+    end
 
     # 2. Gather the indices relative to the leftmost site of A.
     site_ts = site_tensors(ψ)
@@ -19,9 +27,24 @@ function replace_and_decompose!(ψ::VidalMPS, M::ITensor; kwargs...)
     linds = commoninds(M, bond_ts[ns[1] - 1] * site_ts[ns[1]])
 
     # 3. Recursively decompose A with an SVD, until we exhaust the site indices.
-    U, S, V = svd(
+    U, S, V, spectrum = svd(
         M, linds...; lefttags="Link,r=$(ns[1])", righttags="Link,l=$(ns[2])", kwargs...
     )
+    # If M is not from a strictly norm-1 combined tensor (e.g. after non-unitary gate
+    # application or after truncation discards weight), the norm of the MPS will deviate
+    # from 1. We have to renormalise the tensors, otherwise they will violate the canonical
+    # gauge requirements. We have to compensate ψ.norm as well.
+    # Now, `spectrum.truncerr` is the discarded weight from the SVD. Since the overall norm
+    # of the MPS is entirely contained in its `norm` field, the untruncated M always has
+    # unit norm when the canonical gauge holds exactly, regardless of the actual norm of the
+    # state. For this reason, `spectrum.truncerr` should be interpreted as a fractional loss
+    # relative to the norm (actually, to the norm squared), not an absolute one.  The two
+    # formulas coincide when ψ.norm == 1, which is usually "true enough" if the MPS has just
+    # been canonicalised, but can drift apart over time after many small truncations
+    # accumulate, or if there is a proper reason the norm is not 1 (e.g. if we ever
+    # implement imaginary-time evolution).
+    ψ.norm *= sqrt(1 - spectrum.truncerr)
+    S /= sqrt(scalar(S*S))
 
     # Now we assign U to the first site tensors within the segment that is being updated.
     # IF WE ARE APPLYING A MULTI-SITE OPERATOR, WE WILL ALSO NEED TO MULTIPLY site_ts[ns[1]]
@@ -33,13 +56,16 @@ function replace_and_decompose!(ψ::VidalMPS, M::ITensor; kwargs...)
     for n in 2:(N - 1)
         M = S * V
         linds = commoninds(M, bond_ts[ns[n] - 1] * site_ts[ns[n]])
-        U, S, V = svd(
+        U, S, V, spectrum = svd(
             M,
             linds...;
             lefttags="Link,r=$(ns[n])",
             righttags="Link,l=$(ns[n+1])",
             kwargs...,
         )
+
+        ψ.norm *= sqrt(1 - spectrum.truncerr)
+        S /= sqrt(scalar(S*S))
 
         site_ts[ns[n]] = inv.(bond_ts[ns[n - 1]]) * U
         bond_ts[ns[n]] = S
@@ -55,12 +81,18 @@ end
     apply(o::ITensor, ψ::InverseCanonicalMPS; kwargs...)
     product([...])
 
-Get the product of the operator `o` with the MPS `ψ`.
+Compute the product of the operator `o` with the MPS `ψ`. In case `o` is defined on multiple
+sites, the MPS shape is restored via a series of SVDs, that can be controlled via keyword
+arguments.
+
+If the operator is not unitary, the (inverse-) canonical form will be broken in the
+resulting MPS. If you need the properties of the canonical form, consider calling
+`canonicalise` to restore it after the operator is applied.
 
 # Keywords
 
 - `cutoff::Real`: singular value truncation cutoff.
-- `maxdim::Int`: maximum MPS dimension.
+- `maxdim::Int`: maximum MPS bond dimension.
 """
 function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
     ψ = copy(ψ)
@@ -109,10 +141,6 @@ function ITensors.product(o::ITensor, ψ::VidalMPS; kwargs...)
     site_tensors(ψ)[ns′[1]] *= inv.(bond_tensors(ψ)[ns′[1] - 1])
     site_tensors(ψ)[ns′[N]] *= inv.(bond_tensors(ψ)[ns′[N]])
 
-    # If the applied operator is not unitary, it will rescale the columns/rows of the site
-    # tensors on which it acts, in such a way that the orthonormality rules are not
-    # satisfied anymore.  In this case, the MPS should be reorthogonalised in order to
-    # restore the Vidal form.
     return ψ
 end
 
@@ -125,6 +153,10 @@ function replace_and_decompose!(ψ::InverseCanonicalMPS, M::ITensor; kwargs...)
     ns = findsites(ψ, M)
     sort!(ns)
     N = length(ns)  # ≥ 2
+
+    if any(!=(1), diff(ns))
+        error("replace_and_decompose!: non-consecutive application sites are not supported")
+    end
 
     # 2. Gather the indices relative to the leftmost site of A.
     #
@@ -147,9 +179,11 @@ function replace_and_decompose!(ψ::InverseCanonicalMPS, M::ITensor; kwargs...)
 
     # 3. Recursively decompose A with an SVD, until we exhaust the site indices.
     linds = commoninds(M, site_ts[ns[1]])  # = (sⱼ, lⱼ), with j = ns[1]
-    U, S, V = svd(
+    U, S, V, spectrum = svd(
         M, linds...; lefttags="Link,r=$(ns[1])", righttags="Link,l=$(ns[2])", kwargs...
     )
+    ψ.norm *= sqrt(1 - spectrum.truncerr)
+    S /= sqrt(scalar(S*S))
 
     # We assign U to the first site tensors within the segment that is being updated.
     # We will frequently multiply the tensors by delta(inds(S)): it is necessary in order to
@@ -161,13 +195,15 @@ function replace_and_decompose!(ψ::InverseCanonicalMPS, M::ITensor; kwargs...)
         M = (S * V) * delta(inds(S))
         # inds(M) = (lⱼ, sⱼ, s₊₁, ..., sₙ, r), with j = ns[n] and
         linds = commoninds(M, site_ts[ns[n]] * bond_ts[ns[n] - 1])
-        U, S, V = svd(
+        U, S, V, spectrum = svd(
             M,
             linds...;
             lefttags="Link,r=$(ns[n])",
             righttags="Link,l=$(ns[n+1])",
             kwargs...,
         )
+        ψ.norm *= sqrt(1 - spectrum.truncerr)
+        S /= sqrt(scalar(S*S))
 
         site_ts[ns[n]] = (U * S) * delta(inds(S))  # = Λₙ₋₁ U S
         # This tensor already contains the singular values on the left, because it comes
@@ -243,18 +279,18 @@ function simplified_self_contraction(ψ::VidalMPS, A::ITensor)
     #   ───Γ[N]       ───╯
     #
     #
-    #  ╭───Λ[k-1]───Γ[k]───                       ╭───
-    #  │             │                            │
-    #  │             │        =  tr(Λ[k-1]²)  ×   │
-    #  │             │                            │
-    #  ╰───Λ[k-1]───Γ[k]───                       ╰───
+    #  ╭───Λ[k-1]───Γ[k]───        ╭───
+    #  │             │             │
+    #  │             │        =    │
+    #  │             │             │
+    #  ╰───Λ[k-1]───Γ[k]───        ╰───
     #
     #
-    #   ───Γ[k]───Λ[k]───╮                     ───╮
-    #       │            │                        │
-    #       │            │   =  tr(Λ[k]²)  ×      │
-    #       │            │                        │
-    #   ───Γ[k]───Λ[k]───╯                     ───╯
+    #   ───Γ[k]───Λ[k]───╮        ───╮
+    #       │            │           │
+    #       │            │   =       │
+    #       │            │           │
+    #   ───Γ[k]───Λ[k]───╯        ───╯
     #
     #
     # This means that we don't actually need to compute the full contraction. For example,
@@ -278,7 +314,7 @@ function simplified_self_contraction(ψ::VidalMPS, A::ITensor)
     #
     #           ╭──◇──○─╶╶   ╶╶─○──◇──○──◇──○─╶╶   ╶╶─○──◇──╮
     #           │     │         │     │     │         │     │
-    #  =        │     │         │     □     │         │     │  ×  tr(Λ[1]²) tr(Λ[N-1]²)  =
+    #  =        │     │         │     □     │         │     │
     #           │     │         │     │     │         │     │
     #           ╰──◇──○─╶╶   ╶╶─○──◇──○──◇──○─╶╶   ╶╶─○──◇──╯
     #                 3        j-1    j    j+1       N-2
@@ -286,8 +322,8 @@ function simplified_self_contraction(ψ::VidalMPS, A::ITensor)
     #
     #                           ╭──◇──○──◇──╮
     #                           │     │     │
-    #  =                        │     □     │  ×  tr(Λ[1]²) ⋯ tr(Λ[j-2]²)
-    #                           │     │     │            tr(Λ[j+1]²) ⋯ tr(Λ[N-1]²).
+    #  =                        │     □     │
+    #                           │     │     │
     #                           ╰──◇──○──◇──╯
     #                                 j
 
@@ -296,13 +332,7 @@ function simplified_self_contraction(ψ::VidalMPS, A::ITensor)
     Mⱼ =
         bond_tensors(ψ)[first(site_range) - 1] *
         prod(site_tensors(ψ)[j] * bond_tensors(ψ)[j] for j in site_range)
-    contr_pre = prod(
-        scalar(Λ*Λ) for Λ in bond_tensors(ψ)[1:(first(site_range) - 2)]; init=1.0
-    )
-    contr_post = prod(
-        scalar(Λ*Λ) for Λ in bond_tensors(ψ)[(last(site_range) + 1):end]; init=1.0
-    )
-    return contr_pre * contr_post * inner(Mⱼ, apply(A, Mⱼ))
+    return norm(ψ)^2 * inner(Mⱼ, apply(A, Mⱼ))
 end
 
 function simplified_self_contraction(ψ::InverseCanonicalMPS, A::ITensor)
@@ -310,11 +340,11 @@ function simplified_self_contraction(ψ::InverseCanonicalMPS, A::ITensor)
     # tensors are directly contracted with each other, the following cancellation rules
     # hold:
     #
-    #  ╭───C[j]───V[j]───      ╭───Λ[j-1]───Γ[j]───                       ╭───
-    #  │    │                  │             │                            │
-    #  │    │               =  │             │        =  tr(Λ[j-1]²)  ×   │
-    #  │    │                  │             │                            │
-    #  ╰───C[j]───V[j]───      ╰───Λ[j-1]───Γ[j]───                       ╰───
+    #  ╭───C[j]───V[j]───      ╭───Λ[j-1]───Γ[j]───         ╭───
+    #  │    │                  │             │              │
+    #  │    │               =  │             │        =     │
+    #  │    │                  │             │              │
+    #  ╰───C[j]───V[j]───      ╰───Λ[j-1]───Γ[j]───         ╰───
 
     #   C[1]───V[1]───       Γ[j]───       ╭───
     #    │                    │            │
@@ -322,11 +352,11 @@ function simplified_self_contraction(ψ::InverseCanonicalMPS, A::ITensor)
     #    │                    │            │
     #   C[1]───V[1]───       Γ[j]───       ╰───
     #
-    #   ───V[j-1]───C[j]───╮       ───Γ[j]───Λ[j]───╮                     ───╮
-    #                │     │           │            │                        │
-    #                │     │   =       │            │   =  tr(Λ[j]²)  ×      │
-    #                │     │           │            │                        │
-    #   ───V[j-1]───C[j]───╯       ───Γ[j]───Λ[j]───╯                     ───╯
+    #   ───V[j-1]───C[j]───╮       ───Γ[j]───Λ[j]───╮        ───╮
+    #                │     │           │            │           │
+    #                │     │   =       │            │   =       │
+    #                │     │           │            │           │
+    #   ───V[j-1]───C[j]───╯       ───Γ[j]───Λ[j]───╯        ───╯
 
     #   ───V[N-1]───C[N]        ───Γ[N]       ───╮
     #                │              │            │
@@ -355,7 +385,7 @@ function simplified_self_contraction(ψ::InverseCanonicalMPS, A::ITensor)
     #
     #              ╭──▧─╶╶   ╶╶─▧──◆──▧──◆──▧─╶╶   ╶╶─▧──╮
     #              │  │         │     │     │         │  │
-    #  =           │  │         │     □     │         │  │  ×  tr(Λ[1]²) tr(Λ[N-1]²)  =
+    #  =           │  │         │     □     │         │  │
     #              │  │         │     │     │         │  │
     #              ╰──▧─╶╶   ╶╶─▧──◆──▧──◆──▧─╶╶   ╶╶─▧──╯
     #                 3        j-1    j    j+1       N-2
@@ -363,8 +393,8 @@ function simplified_self_contraction(ψ::InverseCanonicalMPS, A::ITensor)
     #
     #                              ╭──▧──╮
     #                              │  │  │
-    #  =                           │  □  │  ×  tr(Λ[1]²) ⋯ tr(Λ[j-2]²)
-    #                              │  │  │            tr(Λ[j+1]²) ⋯ tr(Λ[N-1]²).
+    #  =                           │  □  │
+    #                              │  │  │
     #                              ╰──▧──╯
     #                                 j
 
@@ -375,15 +405,7 @@ function simplified_self_contraction(ψ::InverseCanonicalMPS, A::ITensor)
             site_tensors(ψ)[j] * bond_tensors(ψ)[j] for j in site_range[1:(end - 1)];
             init=ITensors.OneITensor(),
         ) * site_tensors(ψ)[last(site_range)]
-    contr_pre = prod(
-        scalar(inv.(Λ)*inv.(Λ)) for Λ in bond_tensors(ψ)[1:(first(site_range) - 2)];
-        init=1.0,
-    )
-    contr_post = prod(
-        scalar(inv.(Λ)*inv.(Λ)) for Λ in bond_tensors(ψ)[(last(site_range) + 1):end];
-        init=1.0,
-    )
-    return contr_pre * contr_post * inner(Mⱼ, apply(A, Mⱼ))
+    return norm(ψ)^2 * inner(Mⱼ, apply(A, Mⱼ))
 end
 
 """

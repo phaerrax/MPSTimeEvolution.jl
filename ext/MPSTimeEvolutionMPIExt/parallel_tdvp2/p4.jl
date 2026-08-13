@@ -14,6 +14,8 @@ function tdvp2_parallel_sweep_4p!(
 )
     site_range = eachindex(site_ts)
 
+    truncerr = 0.0
+
     bond = last(site_range)
 
     # • Ψₗ ⟵  the partition's rightmost site
@@ -21,7 +23,7 @@ function tdvp2_parallel_sweep_4p!(
     while true
         bond -= 1
         # • Perform two-site update
-        fullupdate!(
+        discarded_weight = fullupdate!(
             site_ts,
             bond_ts,
             PH,
@@ -32,6 +34,8 @@ function tdvp2_parallel_sweep_4p!(
             sweepdir="left",
             current_time=current_time+0.5dt,
         )
+        truncerr += discarded_weight
+
         bond == first(site_range) && break
     end
     @assert bond == first(site_range)
@@ -85,7 +89,7 @@ function tdvp2_parallel_sweep_4p!(
     while true
         bond += 1
         # a) Forward two-site evolution
-        twositeupdate!(
+        discarded_weight = twositeupdate!(
             site_ts,
             bond_ts,
             PH,
@@ -96,6 +100,7 @@ function tdvp2_parallel_sweep_4p!(
             sweepdir="right",
             current_time=current_time+dt,
         )
+        truncerr += discarded_weight
 
         # ...until Ψᵣ is the partition's rightmost site
         bond+1 == last(site_range) && break
@@ -105,5 +110,5 @@ function tdvp2_parallel_sweep_4p!(
     end
     @assert bond+1 == last(site_range)
 
-    return site_ts, bond_ts, PH
+    return site_ts, bond_ts, PH, truncerr
 end

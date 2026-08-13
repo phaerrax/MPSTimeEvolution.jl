@@ -51,7 +51,7 @@ function itensors_tdvp(; dt, tmax, freqs, couplings, check_sites, init)
         H,
         -im * tmax,
         state_0;
-        time_step=-im * dt,
+        time_step=(-im * dt),
         (step_observer!)=obs,
         outputlevel=0,
         updater_kwargs=(; tol=1e-14, krylovdim=30, maxiter=100),  # same as our defaults

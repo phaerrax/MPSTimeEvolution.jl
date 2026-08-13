@@ -35,8 +35,8 @@ function tebd_step!(ψₜ::VidalMPS, gates; cutoff, maxdim)
         Mⱼ′ = apply(u, Mⱼ)
 
         # Update the MPS with the (truncated) updated two-site tensor.
-        # This updates the site_ts[j], bond_ts[j] and site_ts[j+1] tensors, except that the
-        # bond tensors on the left and right still need to be “extracted”.
+        # This updates site_ts[j], bond_ts[j], site_ts[j+1] and the norm, but the bond
+        # tensors on the left and right still need to be “extracted”.
         replace_and_decompose!(ψₜ, Mⱼ′; cutoff=cutoff, maxdim=maxdim)
 
         # Restore the Vidal form by "removing" the singular values we previously
@@ -91,7 +91,8 @@ function tebd1!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
     # evolution according to the operator exp(-tH), useful for thermalization processes.
     evol_dt = -im * dt
     # Discard the imaginary part if time step is real.
-    isreal(evol_dt) && (evol_dt = real(evol_dt))
+    # isreal(evol_dt) && (evol_dt = real(evol_dt))
+    isreal(evol_dt) && error("imaginary-time evolution not implemented for VidalMPS")
 
     # Compute the 1st-order Trotter-Suzuki decomposition.
     u1odd, u1even = trotter1(H, siteinds(ψₜ), evol_dt)
@@ -99,11 +100,6 @@ function tebd1!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
     # Measure everything once in the initial state.
     current_time = zero(dt)
     apply!(cb, ψₜ, TEBD(); current_time=current_time)
-
-    # As we can only apply unitary operators to a Vidal MPS, the norm of the state cannot
-    # change during the evolution as a result of applying the operators.
-    # It can change, however, as a consequence of the truncation following the evolution
-    # step.
     compute_norm!(cb, ψₜ, TEBD(); current_time=current_time)
 
     for s in 1:nsteps
@@ -151,7 +147,8 @@ function tebd2!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
     # evolution according to the operator exp(-tH), useful for thermalization processes.
     evol_dt = -im * dt
     # Discard the imaginary part if time step is real.
-    isreal(evol_dt) && (evol_dt = real(evol_dt))
+    # isreal(evol_dt) && (evol_dt = real(evol_dt))
+    isreal(evol_dt) && error("imaginary-time evolution not implemented for VidalMPS")
 
     # Compute the 1st-order Trotter-Suzuki decomposition.
     u1odd_halfdt, u1even, _ = trotter2(H, siteinds(ψₜ), evol_dt)

@@ -14,6 +14,8 @@ function tdvp2_parallel_sweep_4p!(
 )
     site_range = eachindex(site_ts)
 
+    truncerr = 0.0
+
     # • Ψᵣ ⟵  partition’s leftmost site tensor
     bond = first(site_range)-1
     Ψᵣ = site_ts[bond + 1]
@@ -67,7 +69,7 @@ function tdvp2_parallel_sweep_4p!(
 
     # • Sweep right, starting from bond = first(site_range)...
     while true
-        fullupdate!(
+        discarded_weight = fullupdate!(
             site_ts,
             bond_ts,
             PH,
@@ -78,6 +80,7 @@ function tdvp2_parallel_sweep_4p!(
             sweepdir="right",
             current_time=current_time+0.5dt,
         )
+        truncerr += discarded_weight
 
         # ...until Ψᵣ is the rightmost site in the partition.
         bond+1 == last(site_range) && break
@@ -116,7 +119,7 @@ function tdvp2_parallel_sweep_4p!(
     # • Perform 2-site update on the boundary between process 3 and process 4,
     #   evolving Ψₗ, V, Ψᵣ forwards by dt.
     set_nsite!(PH, 2)
-    Ψₗ, V, Ψᵣ = twositeupdate(
+    Ψₗ, V, Ψᵣ, discarded_weight = twositeupdate(
         Ψₗ,
         V,
         Ψᵣ,
@@ -128,6 +131,7 @@ function tdvp2_parallel_sweep_4p!(
         sweepdir="right",
         current_time=current_time+0.5dt,
     )
+    truncerr += discarded_weight
 
     # • Send Ψₗ, V, Ψᵣ to process 4
     MPI.send(Ψₗ, comm; dest=3, tag=intcode("PsiL"))
@@ -151,7 +155,7 @@ function tdvp2_parallel_sweep_4p!(
     # • Sweep left with full two-site updates, from bond = last(site_range)-1
     while true
         bond -= 1
-        fullupdate!(
+        discarded_weight = fullupdate!(
             site_ts,
             bond_ts,
             PH,
@@ -162,6 +166,8 @@ function tdvp2_parallel_sweep_4p!(
             sweepdir="left",
             current_time=current_time+dt,
         )
+        truncerr += discarded_weight
+
         bond == first(site_range) && break
     end
     @assert bond == first(site_range)
@@ -207,5 +213,5 @@ function tdvp2_parallel_sweep_4p!(
     # • Create βᵣ
     shiftright!(PH, Ψₗ, V)
 
-    return site_ts, bond_ts, PH
+    return site_ts, bond_ts, PH, truncerr
 end

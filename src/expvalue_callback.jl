@@ -319,7 +319,7 @@ function apply!(
         prev_t = 0.0
         push!(measurement_ts(cb), t)
         foreach(values(measurements(cb))) do v
-            push!(v, zero(eltype(v)))
+            return push!(v, zero(eltype(v)))
         end
         #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
     else
@@ -338,7 +338,7 @@ function apply!(
             push!(measurement_ts(cb), t)
             # Create a new slot in which we will put the measurement result.
             foreach(values(measurements(cb))) do v
-                push!(v, zero(eltype(v)))
+                return push!(v, zero(eltype(v)))
             end
         end
         #if site == 1
@@ -418,7 +418,7 @@ function apply!(cb::ExpValueCallback, ψ::VidalMPS, alg::TEBD; current_time, kwa
         prev_t = 0.0
         push!(measurement_ts(cb), current_time)
         foreach(values(measurements(cb))) do v
-            push!(v, zero(eltype(v)))
+            return push!(v, zero(eltype(v)))
         end
     else
         prev_t = measurement_ts(cb)[end]
@@ -436,7 +436,7 @@ function apply!(cb::ExpValueCallback, ψ::VidalMPS, alg::TEBD; current_time, kwa
             push!(measurement_ts(cb), current_time)
             # Create a new slot in which we will put the measurement result.
             foreach(values(measurements(cb))) do v
-                push!(v, zero(eltype(v)))
+                return push!(v, zero(eltype(v)))
             end
         end
         @debug "Computing expectation values on site $site at t = $current_time " *
@@ -509,7 +509,7 @@ function apply!(
         prev_t = 0.0
         push!(measurement_ts(cb), current_time)
         foreach(values(measurements(cb))) do v
-            push!(v, zero(eltype(v)))
+            return push!(v, zero(eltype(v)))
         end
         #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
     else
@@ -528,7 +528,7 @@ function apply!(
             push!(measurement_ts(cb), current_time)
             # Create a new slot in which we will put the measurement result.
             foreach(values(measurements(cb))) do v
-                push!(v, zero(eltype(v)))
+                return push!(v, zero(eltype(v)))
             end
         end
         #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
