@@ -145,9 +145,7 @@ function measure_localops!(cb::ExpValueCallback, state::MPS, site::Int, alg::TDV
     # Operators whose support is contained in `site+1:end` have already been measured in
     # previous calls of this function.
     for localop in filter(l -> first(domain(l)) == site, ops(cb))
-        measurements(cb)[localop][end] = _expval_while_sweeping(state, localop)
-        # `measurements(cb)[localop][end]` is the last line in the measurements of `localop`
-        # which we (must) have created in `apply!` before calling this function.
+        push!(measurements(cb)[localop], _expval_while_sweeping(state, localop))
     end
 
     return nothing
@@ -178,9 +176,7 @@ function measure_localops!(cb::ExpValueCallback, psiL::MPS, psiR::MPS, alg::TDVP
             op(opname, siteind(psiR, opsite)) for
             (opname, opsite) in zip(factors(l), domain(l))
         )
-        measurements(cb)[l][end] = dot(psiL, apply(lop, psiR))
-        # measurements(cb)[localop][end] is the last line in the measurements of localop,
-        # which we (must) have created in apply! before calling this function.
+        push!(measurements(cb)[l], dot(psiL, apply(lop, psiR)))
     end
 
     return nothing
@@ -229,9 +225,7 @@ function measure_localops!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec)
                 x *= ids[n]
             end
         end
-        measurements(cb)[l][end] = scalar(x)
-        # `measurements(cb)[l][end]` is the last element in the measurements of `l`,
-        # which we (must) have created in `apply!` before calling this function.
+        push!(measurements(cb)[l], scalar(x))
     end
 
     # Since computing `ids` might require a little time, we return it so that other methods
@@ -272,9 +266,8 @@ function apply!(
     # For TDVP we can perform measurements to the right of each site when sweeping back
     # left.
     if sweepend && sweepdir == "left"
-        on_schedule, is_new_step = register_time!(cb, current_time)
+        on_schedule, _ = register_time!(cb, current_time)
         if on_schedule
-            is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
             @debug "Computing expectation values on site $site at t = $current_time"
             measure_localops!(cb, state, site, alg)
         end
@@ -294,9 +287,8 @@ function apply!(
     kwargs...,
 )
     if sweepend && sweepdir == "left"
-        on_schedule, is_new_step = register_time!(cb, current_time)
+        on_schedule, _ = register_time!(cb, current_time)
         if on_schedule
-            is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
             @debug "Computing expectation values at t = $current_time"
             measure_localops!(cb, state1, state2, alg)
         end
@@ -309,9 +301,8 @@ function apply!(
     cb::ExpValueCallback, state::MPS, alg::TDVP1vec; current_time, sweepend, kwargs...
 )
     if sweepend
-        on_schedule, is_new_step = register_time!(cb, current_time)
+        on_schedule, _ = register_time!(cb, current_time)
         if on_schedule
-            is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
             @debug "Computing expectation values at t = $current_time"
             measure_localops!(cb, state, alg)
         end
@@ -321,17 +312,13 @@ function apply!(
 end
 
 function apply!(cb::ExpValueCallback, ψ::VidalMPS, alg::TEBD; current_time, kwargs...)
-    on_schedule, is_new_step = register_time!(cb, current_time)
+    on_schedule, _ = register_time!(cb, current_time)
     if on_schedule
-        is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
-
         @debug "Computing expectation values on site $site at t = $current_time"
         # We don't need to do anything special. The `expect` function is already optimised
         # and only considers the sites affected by the operator we are going to measure.
         for localop in ops(cb)
-            measurements(cb)[localop][end] = expect(ψ, localop)
-            # `measurements(cb)[localop][end]` is the last line in the measurements of
-            # `localop` which we (must) have created before calling this function.
+            push!(measurements(cb)[localop], expect(ψ, localop))
         end
     end
 

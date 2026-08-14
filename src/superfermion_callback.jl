@@ -156,9 +156,7 @@ function measure_localops!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec)
                 x *= ids[_sf_translate_sites_inv(n)]
             end
         end
-        measurements(cb)[l][end] = scalar(x)
-        # `measurements(cb)[l][end]` is the last element in the measurements of `l`,
-        # which we (must) have created in `apply!` before calling this function.
+        push!(measurements(cb)[l], scalar(x))
     end
 
     # Since computing `ids` might require a little time, we return it so that other methods
@@ -193,9 +191,8 @@ function apply!(
     cb::SuperfermionCallback, state::MPS, alg::TDVP1vec; current_time, sweepend, kwargs...
 )
     if sweepend
-        on_schedule, is_new_step = register_time!(cb, current_time)
+        on_schedule, _ = register_time!(cb, current_time)
         if on_schedule
-            is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
             @debug "Computing expectation values on site $site at t = $current_time"
             measure_localops!(cb, state, alg)
         end
