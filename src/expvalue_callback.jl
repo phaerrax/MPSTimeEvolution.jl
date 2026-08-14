@@ -154,15 +154,8 @@ function measure_localops!(cb::ExpValueCallback, state::MPS, site::Int, alg::TDV
 end
 
 function compute_norm!(cb::ExpValueCallback, state::MPS, alg::TDVP1; current_time)
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
     # No optimisation needed here---ITensors uses the orthocentre only already.
-    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
-        push!(measurements_norm(cb), norm(state))
-    end
+    is_measurement_time(cb, current_time) && push!(measurements_norm(cb), norm(state))
 
     return nothing
 end
@@ -196,14 +189,7 @@ end
 function compute_overlap!(
     cb::ExpValueCallback, psiL::MPS, psiR::MPS, alg::TDVP1; current_time
 )
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
-    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
-        push!(measurements_norm(cb), dot(psiL, psiR))
-    end
+    is_measurement_time(cb, current_time) && push!(measurements_norm(cb), dot(psiL, psiR))
 
     return nothing
 end
@@ -256,27 +242,15 @@ end
 function compute_trace!(
     cb::ExpValueCallback, ids::Vector{ITensor}, alg::TDVP1vec; current_time
 )
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
     # From precomputed `ids`: we just multiply the elements together.
-    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
-        push!(measurements_norm(cb), scalar(prod(ids)))
-    end
+    is_measurement_time(cb, current_time) && push!(measurements_norm(cb), scalar(prod(ids)))
 
     return nothing
 end
 
 function compute_trace!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec; current_time)
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
     # From scratch: we contract each tensor from `ψ` with the identity, separately.
-    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
+    if is_measurement_time(cb, current_time)
         ids = [state("Id", siteind(ψ, n)) * ψ[n] for n in eachindex(ψ)]
         push!(measurements_norm(cb), scalar(prod(ids)))
     end
@@ -285,41 +259,25 @@ function compute_trace!(cb::ExpValueCallback, ψ::MPS, alg::TDVP1vec; current_ti
 end
 
 function apply!(
-    cb::ExpValueCallback, state::MPS, alg::TDVP1; t, sweepend, sweepdir, site, kwargs...
+    cb::ExpValueCallback,
+    state::MPS,
+    alg::TDVP1;
+    current_time,
+    sweepend,
+    sweepdir,
+    site,
+    kwargs...,
 )
-    if isempty(measurement_ts(cb))
-        # Initialize `cb` here.
-        @debug "No measurements found (t = $t). Initialising callback object."
-        prev_t = 0.0
-        push!(measurement_ts(cb), t)
-        foreach(values(measurements(cb))) do v
-            push!(v, zero(eltype(v)))
-        end
-        #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
-    else
-        prev_t = measurement_ts(cb)[end]
-        @debug "Found previous measurements (t = $t, prev_t = $prev_t)."
-    end
-
     # We perform measurements only at the end of a sweep and at measurement steps.
     # For TDVP we can perform measurements to the right of each site when sweeping back
     # left.
-    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend && sweepdir == "left"
-        if t != prev_t
-            @debug "Adding t = $t to the list of time instants of the callback."
-            # Add the current time to the list of time instants at which we measured
-            # something.
-            push!(measurement_ts(cb), t)
-            # Create a new slot in which we will put the measurement result.
-            foreach(values(measurements(cb))) do v
-                push!(v, zero(eltype(v)))
-            end
+    if sweepend && sweepdir == "left"
+        on_schedule, is_new_step = register_time!(cb, current_time)
+        if on_schedule
+            is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
+            @debug "Computing expectation values on site $site at t = $current_time"
+            measure_localops!(cb, state, site, alg)
         end
-        #if site == 1
-        #    push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
-        #end
-        @debug "Computing expectation values on site $site at t = $t (prev_t = $prev_t)"
-        measure_localops!(cb, state, site, alg)
     end
 
     return nothing
@@ -330,98 +288,50 @@ function apply!(
     state1::MPS,
     state2::MPS,
     alg::TDVP1;
-    t,
+    current_time,
     sweepend,
     sweepdir,
     kwargs...,
 )
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
-
-    # We perform measurements only at the end of a sweep and at measurement steps.  For TDVP
-    # we can perform measurements to the right of each site when sweeping back left.
-    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend && sweepdir == "left"
-        @debug "Computing expectation values at t = $t (prev_t = $prev_t)"
-        if (t != prev_t || t == 0)
-            # Add the current time to the list of time instants at which we measured
-            # something.
-            push!(measurement_ts(cb), t)
-            # Create a new slot in which we will put the measurement result.
-            foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
-            #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+    if sweepend && sweepdir == "left"
+        on_schedule, is_new_step = register_time!(cb, current_time)
+        if on_schedule
+            is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
+            @debug "Computing expectation values at t = $current_time"
+            measure_localops!(cb, state1, state2, alg)
         end
-        measure_localops!(cb, state1, state2, alg)
     end
 
     return nothing
 end
 
-function apply!(cb::ExpValueCallback, state::MPS, alg::TDVP1vec; t, sweepend, kwargs...)
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
-
-    # We perform measurements only at the end of a sweep and at measurement steps.
-    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend
-        @debug "Computing expectation values at t = $t (prev_t = $prev_t)"
-        if (t != prev_t || t == 0)
-            # Add the current time to the list of time instants at which we measured
-            # something.
-            push!(measurement_ts(cb), t)
-            # Create a new slot in which we will put the measurement result.
-            foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
-            #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+function apply!(
+    cb::ExpValueCallback, state::MPS, alg::TDVP1vec; current_time, sweepend, kwargs...
+)
+    if sweepend
+        on_schedule, is_new_step = register_time!(cb, current_time)
+        if on_schedule
+            is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
+            @debug "Computing expectation values at t = $current_time"
+            measure_localops!(cb, state, alg)
         end
-        measure_localops!(cb, state, alg)
     end
 
     return nothing
 end
-
-### TEBD
 
 function apply!(cb::ExpValueCallback, ψ::VidalMPS, alg::TEBD; current_time, kwargs...)
-    if isempty(measurement_ts(cb))
-        # Initialize `cb` here.
-        @debug "No measurements found (t = $current_time). Initialising callback object."
-        prev_t = 0.0
-        push!(measurement_ts(cb), current_time)
-        foreach(values(measurements(cb))) do v
-            push!(v, zero(eltype(v)))
-        end
-    else
-        prev_t = measurement_ts(cb)[end]
-        @debug "Found previous measurements (t = $current_time, prev_t = $prev_t)."
-    end
+    on_schedule, is_new_step = register_time!(cb, current_time)
+    if on_schedule
+        is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
 
-    # We perform measurements only at the end of a sweep and at measurement steps.
-    # For TDVP we can perform measurements to the right of each site when sweeping back
-    # left.
-    if current_time - prev_t ≈ callback_dt(cb) || current_time == prev_t
-        if current_time != prev_t
-            @debug "Adding t = $current_time to the list of time instants of the callback."
-            # Add the current time to the list of time instants at which we measured
-            # something.
-            push!(measurement_ts(cb), current_time)
-            # Create a new slot in which we will put the measurement result.
-            foreach(values(measurements(cb))) do v
-                push!(v, zero(eltype(v)))
-            end
-        end
-        @debug "Computing expectation values on site $site at t = $current_time " *
-            "(prev_t = $prev_t)"
-
-        # We don't need to do anything special. The `expect` function is already optimised and
-        # only considers the sites affected by the operator we are going to measure.
+        @debug "Computing expectation values on site $site at t = $current_time"
+        # We don't need to do anything special. The `expect` function is already optimised
+        # and only considers the sites affected by the operator we are going to measure.
         for localop in ops(cb)
             measurements(cb)[localop][end] = expect(ψ, localop)
-            # `measurements(cb)[localop][end]` is the last line in the measurements of `localop`
-            # which we (must) have created in `apply!` before calling this function.
+            # `measurements(cb)[localop][end]` is the last line in the measurements of
+            # `localop` which we (must) have created before calling this function.
         end
     end
 
@@ -429,15 +339,8 @@ function apply!(cb::ExpValueCallback, ψ::VidalMPS, alg::TEBD; current_time, kwa
 end
 
 function compute_norm!(cb::ExpValueCallback, ψ::VidalMPS, alg::TEBD; current_time)
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
     # No optimisation needed here---ITensors uses the orthocentre only already.
-    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
-        push!(measurements_norm(cb), norm(ψ))
-    end
+    is_measurement_time(cb, current_time) && push!(measurements_norm(cb), norm(ψ))
 
     return nothing
 end

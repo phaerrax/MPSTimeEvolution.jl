@@ -94,7 +94,7 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
 
     # Measure everthing once in the initial state.
     current_time = 0.0
-    apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+    apply!(cb, state, TDVP1vec(); current_time, sweepend=true)
     compute_trace!(cb, state, TDVP1vec(); current_time=current_time)
 
     if store_state0
@@ -134,7 +134,7 @@ function tdvp1vec!(solver, state::MPS, PH, dt, tmax; kwargs...)
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
-        time_meas = @elapsed apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+        time_meas = @elapsed apply!(cb, state, TDVP1vec(); current_time, sweepend=true)
 
         @debug "Time spent on time-evolution step: $time_evol s" *
             "\nTime spent on computing expectation values: $time_meas s"
@@ -233,7 +233,7 @@ function adaptivetdvp1vec!(
 
     # Measure everthing once in the initial state.
     current_time = 0.0
-    apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+    apply!(cb, state, TDVP1vec(); current_time, sweepend=true)
     compute_trace!(cb, state, TDVP1vec(); current_time=current_time)
 
     if store_state0
@@ -280,7 +280,7 @@ function adaptivetdvp1vec!(
 
         # Now the backwards sweep has ended, so the whole MPS of the state is up-to-date.
         # We can then calculate the expectation values of the observables within cb.
-        time_meas = @elapsed apply!(cb, state, TDVP1vec(); t=current_time, sweepend=true)
+        time_meas = @elapsed apply!(cb, state, TDVP1vec(); current_time, sweepend=true)
 
         @debug "Time spent on time-evolution step: $time_evol s" *
             "\nTime spent on computing expectation values: $time_meas s"

@@ -99,7 +99,7 @@ function VidalMPS(::Type{T}, sites::Vector{<:Index}) where {T<:Number}
 end
 
 function VidalMPS(sites::Vector{<:Index}, args...; kwargs...)
-    VidalMPS(Float64, sites, args...; kwargs...)
+    return VidalMPS(Float64, sites, args...; kwargs...)
 end
 
 """

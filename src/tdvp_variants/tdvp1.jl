@@ -94,7 +94,7 @@ function tdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
     current_time = 0.0
     for j in reverse(eachindex(state))
         orthogonalize!(state, j)
-        apply!(cb, state, TDVP1(); t=current_time, site=j, sweepend=true, sweepdir="left")
+        apply!(cb, state, TDVP1(); current_time, site=j, sweepend=true, sweepdir="left")
     end
     compute_norm!(cb, state, TDVP1(); current_time=current_time)
 
@@ -165,7 +165,7 @@ function tdvp1!(solver, state::MPS, PH, dt, tmax; kwargs...)
                 cb,
                 state,
                 TDVP1();
-                t=current_time + dt,
+                current_time=current_time + dt,
                 site=site,
                 sweepend=(ha == 2),
                 sweepdir=sweepdir,
@@ -323,7 +323,7 @@ function adaptivetdvp1!(
     current_time = 0.0
     for j in reverse(eachindex(state))
         orthogonalize!(state, j)
-        apply!(cb, state, TDVP1(); t=current_time, site=j, sweepend=true, sweepdir="left")
+        apply!(cb, state, TDVP1(); current_time, site=j, sweepend=true, sweepdir="left")
     end
     compute_norm!(cb, state, TDVP1(); current_time=current_time)
 
@@ -391,7 +391,7 @@ function adaptivetdvp1!(
                 cb,
                 state,
                 TDVP1();
-                t=current_time + dt,
+                current_time=current_time + dt,
                 site=site,
                 sweepend=(ha == 2),
                 sweepdir=sweepdir,

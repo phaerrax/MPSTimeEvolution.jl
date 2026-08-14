@@ -129,7 +129,7 @@ function parseoperators(s::AbstractString)
         # sequence such as x(1,2,3)
         d = Dict{Int,String}()
         foreach(eachmatch(r"(?<name>.+?)\((?<site>\d+?)\)", opstrings[i])) do re
-            push!(d, parse(Int, re["site"]) => re["name"])
+            return push!(d, parse(Int, re["site"]) => re["name"])
         end
         push!(ops, LocalOperator(d))
         i += 1

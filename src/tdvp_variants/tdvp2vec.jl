@@ -89,7 +89,7 @@ function tdvp2vec!(state, L::MPO, dt, tmax; kwargs...)
                 apply!(
                     cb,
                     state;
-                    t=s * dt,
+                    current_time=s * dt,
                     bond=bond,
                     sweepend=(ha == 2),
                     # apply! does nothing if sweepend is false, so this way we are doing

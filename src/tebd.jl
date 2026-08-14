@@ -98,13 +98,13 @@ function tebd1!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
 
     # Measure everything once in the initial state.
     current_time = zero(dt)
-    apply!(cb, ψₜ, TEBD(); current_time=current_time)
+    apply!(cb, ψₜ, TEBD(); current_time)
 
     # As we can only apply unitary operators to a Vidal MPS, the norm of the state cannot
     # change during the evolution as a result of applying the operators.
     # It can change, however, as a consequence of the truncation following the evolution
     # step.
-    compute_norm!(cb, ψₜ, TEBD(); current_time=current_time)
+    compute_norm!(cb, ψₜ, TEBD(); current_time)
 
     for s in 1:nsteps
         stime = @elapsed begin
@@ -177,13 +177,13 @@ function tebd2!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
 
     # Measure everything once in the initial state.
     current_time = zero(dt)
-    apply!(cb, ψₜ, TEBD(); current_time=current_time)
+    apply!(cb, ψₜ, TEBD(); current_time)
 
     # As we can only apply unitary operators to a Vidal MPS, the norm of the state cannot
     # change during the evolution as a result of applying the operators.
     # It can change, however, as a consequence of the truncation following the evolution
     # step.
-    compute_norm!(cb, ψₜ, TEBD(); current_time=current_time)
+    compute_norm!(cb, ψₜ, TEBD(); current_time)
 
     for _ in 1:nsteps_grouped
         stime_merged_steps = @elapsed begin
@@ -228,8 +228,8 @@ function tebd2!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
         # measure them.
         # FIXME Does something unpleasant happen if measurement_dt is not an integer
         # multiple of dt?
-        apply!(cb, ψₜ, TEBD(); current_time=current_time)
-        compute_norm!(cb, ψₜ, TEBD(); current_time=current_time)
+        apply!(cb, ψₜ, TEBD(); current_time)
+        compute_norm!(cb, ψₜ, TEBD(); current_time)
 
         !isnothing(pbar) &&
             ProgressMeter.next!(pbar; showvalues=simulationinfo(ψₜ, current_time, stime))

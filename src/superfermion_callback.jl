@@ -12,10 +12,10 @@ end
 _sf_translate_sites(n::Int) = 2n-1
 _sf_translate_sites_inv(n::Int) = div(n+1, 2)
 function _sf_translate_sites(op::LocalOperator)
-    LocalOperator(Dict(_sf_translate_sites(k) => v for (k, v) in op.terms))
+    return LocalOperator(Dict(_sf_translate_sites(k) => v for (k, v) in op.terms))
 end
 function _sf_translate_sites_inv(op::LocalOperator)
-    LocalOperator(Dict(_sf_translate_sites_inv(k) => v for (k, v) in op.terms))
+    return LocalOperator(Dict(_sf_translate_sites_inv(k) => v for (k, v) in op.terms))
 end
 
 """
@@ -75,7 +75,7 @@ sites(cb::SuperfermionCallback) = cb.sites
 expvalues(cb::SuperfermionCallback) = sort(cb.measurements)
 expvalues(cb::SuperfermionCallback, lop::LocalOperator) = cb.measurements[lop]
 function expvalues(cb::SuperfermionCallback, name::AbstractString)
-    expvalues(cb, LocalOperator(name))
+    return expvalues(cb, LocalOperator(name))
 end
 
 function Base.show(io::IO, cb::SuperfermionCallback)
@@ -169,27 +169,15 @@ end
 function compute_trace!(
     cb::SuperfermionCallback, ids::Vector{ITensor}, alg::TDVP1vec; current_time
 )
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
     # From precomputed `ids`: we just multiply the elements together.
-    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
-        push!(measurements_norm(cb), scalar(prod(ids)))
-    end
+    is_measurement_time(cb, current_time) && push!(measurements_norm(cb), scalar(prod(ids)))
 
     return nothing
 end
 
 function compute_trace!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec; current_time)
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
     # From scratch: we contract each tensor from `ψ` with the identity, separately.
-    if current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
+    if is_measurement_time(cb, current_time)
         sf_id_blocks = _sf_id_pairs(siteinds(ψ))
         ids = [
             dag(sf_id_blocks[_sf_translate_sites_inv(n)]) * ψ[n] * ψ[n + 1] for
@@ -201,23 +189,16 @@ function compute_trace!(cb::SuperfermionCallback, ψ::MPS, alg::TDVP1vec; curren
     return nothing
 end
 
-function apply!(cb::SuperfermionCallback, state::MPS, alg::TDVP1vec; t, sweepend, kwargs...)
-    if isempty(measurement_ts(cb))
-        prev_t = 0
-    else
-        prev_t = measurement_ts(cb)[end]
-    end
-
-    if (t - prev_t ≈ callback_dt(cb) || t == prev_t) && sweepend
-        if (t != prev_t || t == 0)
-            # Add the current time to the list of time instants at which we measured
-            # something.
-            push!(measurement_ts(cb), t)
-            # Create a new slot in which we will put the measurement result.
-            foreach(x -> push!(x, zero(eltype(x))), values(measurements(cb)))
-            #push!(measurements_norm(cb), zero(eltype(measurements_norm(cb))))
+function apply!(
+    cb::SuperfermionCallback, state::MPS, alg::TDVP1vec; current_time, sweepend, kwargs...
+)
+    if sweepend
+        on_schedule, is_new_step = register_time!(cb, current_time)
+        if on_schedule
+            is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
+            @debug "Computing expectation values on site $site at t = $current_time"
+            measure_localops!(cb, state, alg)
         end
-        measure_localops!(cb, state, alg)
     end
 
     return nothing

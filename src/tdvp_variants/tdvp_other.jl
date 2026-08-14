@@ -130,7 +130,7 @@ function tdvp2!(ψ, H::MPO, timestep, endtime; kwargs...)
                 apply!(
                     cb,
                     ψ;
-                    t=s * timestep,
+                    current_time=s * timestep,
                     # This is only for storage purposes; we need the original `timestep`.
                     bond=b,
                     sweepend=(ha == 2), # apply! is skipped if ha == 1
@@ -293,7 +293,7 @@ function tdvpMC!(state, H::MPO, dt, tmax; kwargs...)
                 apply!(
                     cb,
                     state;
-                    t=s * dt,
+                    current_time=s * dt,
                     bond=bond,
                     sweepend=(ha == 2),
                     # apply! does nothing if sweepend is false, so this way we are doing

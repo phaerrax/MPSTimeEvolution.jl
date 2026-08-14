@@ -39,7 +39,9 @@ function expval_vec(; N=10)
 
     cb = ExpValueCallback("N(1),N(3),Adag(1)F(3)A(8),A(4)Adag(6)", s, 0.1)
 
-    MPSTimeEvolution.apply!(cb, x, MPSTimeEvolution.TDVP1vec(); t=0, sweepend=true)
+    MPSTimeEvolution.apply!(
+        cb, x, MPSTimeEvolution.TDVP1vec(); current_time=0, sweepend=true
+    )
     ev_cb = [MPSTimeEvolution.measurements(cb)[l][end] for l in MPSTimeEvolution.ops(cb)]
 
     ev_inner = [inner(
@@ -67,7 +69,9 @@ function expval_vec_sf(; N=10)
     ]
     cb = ExpValueCallback(operators, s, 0.1)
 
-    MPSTimeEvolution.apply!(cb, x, MPSTimeEvolution.TDVP1vec(); t=0, sweepend=true)
+    MPSTimeEvolution.apply!(
+        cb, x, MPSTimeEvolution.TDVP1vec(); current_time=0, sweepend=true
+    )
     ev_trad = [MPSTimeEvolution.measurements(cb)[l][end] for l in MPSTimeEvolution.ops(cb)]
 
     # Check the correct behaviour of the `measure_localops!(cb, ψ, alg::TDVP1vec)` method.
@@ -92,7 +96,9 @@ function expval_vec_sf(; N=10)
     ]
     cb = SuperfermionCallback(operators, s, 0.1)
 
-    MPSTimeEvolution.apply!(cb, x, MPSTimeEvolution.TDVP1vec(); t=0, sweepend=true)
+    MPSTimeEvolution.apply!(
+        cb, x, MPSTimeEvolution.TDVP1vec(); current_time=0, sweepend=true
+    )
     ev_sf = [MPSTimeEvolution.measurements(cb)[l][end] for l in MPSTimeEvolution.ops(cb)]
 
     return all(ev_trad .≈ ev_sf)
