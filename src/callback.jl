@@ -95,37 +95,48 @@ function expvalues end
 
 expvalues(cb::NoTEvoCallback) = nothing
 
-"""
-    A Measurement object is an alias for `Vector{Float64}`, in other words an
-    array of real numbers.
+### SpecCallback
 
-    Given a Measurement `M`, the result for the measurement at step `n` is `M[n]`.
-"""
-const Measurement = Vector{Float64}
+# The following callback type is not actively used in this package (either in tests or in
+# the documentation) but it's an interesting example of what we could do with callback: not
+# just recording expectation values, but also more complicated operations on the MPS such as
+# computing the bipartition entropy or storing the bond dimensions.
 
-struct SpecCallback <: TEvoCallback
+mutable struct SpecCallback <: TEvoCallback
     truncerrs::Vector{Float64}
-    current_truncerr::Base.RefValue{Float64}
-    entropies::Measurement
-    bonddims::Vector{Vector{Int64}}
-    bonds::Vector{Int64}
+    entropies::Vector{Float64}
+    bonddims::Vector{Vector{Int}}
+    bonds::Vector{Int}
     ts::Vector{Float64}
     dt_measure::Float64
+
+    # This callback accumulates values (truncation errors, bond dimensions on swept bonds,
+    # etc.) across multiple `apply!` calls (one per bond) within a single sweep. It needs
+    # somewhere to hold the in-progress values between calls, since the function has no
+    # state or storage of its own. For this reason we use a "scratch space" for the
+    # `truncerrs`, `entropies` and `bonddims` fields above.
+    # (This implies that we need to make the struct mutable --- another approach would be to
+    # declare `current_truncerr` as `Base.RefValue{Float64}`, but that's discouraged now.)
+    current_truncerr::Float64
+    current_entropies::Vector{Float64}
+    current_bonddims::Vector{Int}
 end
 
-function SpecCallback(dt, psi::MPS, bonds::Vector{Int64}=collect(1:(length(psi) - 1)))
+function SpecCallback(dt, psi::MPS, bonds=1:(length(psi) - 1))
     bonds = sort(unique(bonds))
     if maximum(bonds) > length(psi) - 1 || minimum(bonds) < 1
         throw("bonds must be between 1 and $(length(psi)-1)")
     end
     return SpecCallback(
-        Vector{Float64}(),
-        Ref(0.0),
-        Measurement(),
-        Vector{Vector{Int64}}(),
+        Float64[],
+        Float64[],
+        Vector{Int}[],
         bonds,
-        Vector{Float64}(),
+        Float64[],
         dt,
+        0.0,
+        zeros(Float64, length(bonds)),
+        zeros(Int, length(bonds)),
     )
 end
 
@@ -152,31 +163,34 @@ function Base.show(io::IO, cb::SpecCallback)
 end
 
 function apply!(
-    cb::SpecCallback, psi; current_time, sweepend, bond, spec, sweepdir, kwargs...
+    cb::SpecCallback, state, alg; current_time, sweepend, bond, spec, sweepdir, kwargs...
 )
-    cb.current_truncerr[] += truncerror(spec)
+    cb.current_truncerr += truncerror(spec)
 
     if sweepend
-        on_schedule, is_new_step = register_time!(cb, current_time)
+        on_schedule, _ = register_time!(cb, current_time)
         if on_schedule
-            is_new_step && foreach(v -> push!(v, zero(eltype(v))), values(measurements(cb)))
-            measure_localops!(cb, state, alg)
-
-            if is_new_step
-                push!(measurement_ts(cb), current_time)
-                push!(cb.bonddims, zeros(Int64, length(cb.bonds)))
-                push!(cb.entropies, zeros(length(cb.bonds)))
-            end
+            # measure_localops!(cb, state, alg)
+            # This is disabled, for now, since there's no `measure_localops!` method anyway
+            # that's targeted towards the SpecCallback type.
 
             if bond in bonds(cb)
-                i = findfirst(x -> x == bond, bonds(cb))
-                cb.bonddims[end][i] = length(eigs(spec))
-                cb.entropies[end][i] = entropy(spec)
+                i = findfirst(==(bond), bonds(cb))
+                cb.current_bonddims[i] = length(eigs(spec))
+                cb.current_entropies[i] = entropy(spec)
             end
-            if sweepdir == "right" && bond == length(psi) - 1
-                push!(cb.truncerrs, cb.current_truncerr[])
-            elseif sweepdir == "left" && bond == 1
-                push!(cb.truncerrs, cb.current_truncerr[])
+
+            if sweepdir == "left" && bond == 1
+                # We're at the end of the time step: flush the temporary storage to the
+                # actual result arrays. 
+                push!(cb.truncerrs, cb.current_truncerr)
+                push!(cb.bonddims, cb.current_bonddims)
+                push!(cb.entropies, cb.current_entropies)
+                # Reset the scratch arrays to zero right after each flush, so that the next
+                # sweep starts writing from a clean slate. Not the truncation error though:
+                # that one is a cumulative counter.
+                cb.current_bonddims = zeros(Int, length(bonds(cb)))
+                cb.current_entropies = zeros(Float64, length(bonds(cb)))
             end
         end
     end
