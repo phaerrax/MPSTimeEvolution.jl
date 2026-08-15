@@ -1,31 +1,31 @@
 export TEvoCallback,
     NoTEvoCallback, SpecCallback, measurement_ts, measurements_norm, callback_dt, expvalues
 
-"""
-A TEvoCallback can implement the following methods:
+###  Callback interface
+# Required for each concrete type:
+# - callback_dt(cb): time steps at which the callback needs access for the state (e.g. for
+#   measurements). This is used for time evolution where several time steps are bunched
+#   together to reduce the cost.
+# - apply!(cb, state[, state2], alg; current_time, kwargs...) — apply the operations defined
+#   in the callback to the state (or the states), e.g., perform measurements. These
+#   operations are meant to be performed not at each time step, but each callback_dt. Use
+#   the register_time! and is_measurement_time methods to implement this feature.
+# - measurement_ts(cb), measurements(cb), callback_dt(cb) — storage accessors.
+#
+# Optional, otherwise they default to the TEvoCallback methods:
+# - checkdone!(cb, args...; kwargs...) = false — check whether some criterion to stop the
+#   time evolution is satisfied (e.g., convergence of observable, error too large) and
+#   return `true` if so.
+# - compute_normalization!(cb, state, alg; current_time) — only meaningful for callbacks
+#   that track a norm/trace/overlap.
 
-- apply!(cb::TEvoCallback, psi ; t, kwargs...): apply the callback with the
-current state `psi` (e.g. perform some measurement)
-
-- checkdone!(cb::TEvoCallback, psi; t, kwargs...): check whether some criterion
-to stop the time evolution is satisfied (e.g. convergence of cbervable, error
-too large) and return `true` if so.
-
-- callback_dt(cb::TEvoCallback): time-steps at which the callback needs access
-for the wave-function (e.g. for measurements). This is used for TEBD evolution
-where several time-steps are bunched together to reduce the cost.
-"""
 abstract type TEvoCallback end
 
-"""
-    NoTEvoCallback is a trivial implementation of an evolution callback (<:TEvoCallback)
-    object.
-"""
-struct NoTEvoCallback <: TEvoCallback end
-
-apply!(cb::NoTEvoCallback, args...; kwargs...) = nothing
-checkdone!(cb::NoTEvoCallback, args...; kwargs...) = false
-callback_dt(cb::NoTEvoCallback) = 0
+# Don't provide a default implementation for `apply!` and `callback_dt`: every callback must
+# define its own. The whole point of a callback method is what it does in the `apply!`
+# function, and defining a default callback time step may lead to sneaky bugs.
+checkdone!(cb::TEvoCallback, args...; kwargs...) = false
+compute_normalization!(cb::TEvoCallback, args...; kwargs...) = nothing
 
 function previous_recorded_time(cb::TEvoCallback)
     return if isempty(measurement_ts(cb))  # = is this the very first measurement?
@@ -39,7 +39,7 @@ function previous_recorded_time(cb::TEvoCallback)
     # also to consider the second case.
 end
 
-function is_measurement_time(cb, current_time)
+function is_measurement_time(cb::TEvoCallback, current_time)
     prev_t = previous_recorded_time(cb)
     return current_time - prev_t ≈ callback_dt(cb) || current_time ≈ prev_t
 end
@@ -48,19 +48,19 @@ end
     register_time!(cb::TEvoCallback, current_time)
 
 Given the current simulation time `current_time`, determine whether `current_time` lies on a
-measurement instant for `cb`. Returns two `Bool` results (`on_schedule`, `is_new_step`):
+measurement instant for `cb`. Returns `true` if `current_time` is either exactly
+`callback_dt(cb)` past the last recorded time, or if this is a repeated call at the same
+`current_time`.
 
-- `on_schedule`: `true` if `current_time` is either exactly `callback_dt(cb)` past the last
-  recorded time, or if this is a repeated call at the same `current_time`
-- `is_new_step`: `true` only on the first call at a new `current_time`
-
-If `is_new_step` is `true`, `current_time` is pushed onto `measurement_ts(cb)` as a side
-effect.
+If this is the first time `current_time` is hit during a time step, it is recorded into
+`measurement_ts(cb)` as a side effect.
 """
 function register_time!(cb::TEvoCallback, current_time)
     prev_t = previous_recorded_time(cb)
     on_schedule = is_measurement_time(cb, current_time)
 
+    # If this is the first time that `current_time` is hit, the callback needs to record
+    # `current_time` in its list.
     is_new_step = if on_schedule && !isempty(measurement_ts(cb))
         current_time != prev_t
     else
@@ -70,30 +70,16 @@ function register_time!(cb::TEvoCallback, current_time)
         push!(measurement_ts(cb), current_time)
         @debug "Adding t = $current_time to the time instants recorded by the callback."
     end
-    # We need to discriminate whether this is the first time that `current_time` is hit, in
-    # which case the callback will need to allocate a fresh storage slot for each quantity
-    # it tracks, before measuring into it.
 
-    return on_schedule, is_new_step
+    return on_schedule
 end
 
-"""
-    expvalues(cb::ExpValueCallback)
-    expvalues(cb::ExpValueCallback, lop::LocalOperator)
-    expvalues(cb::ExpValueCallback, name::AbstractString)
+# Trivial implementation of an evolution callback object (it does nothing and stores
+# nothing). Used as default callback in time-evolution methods.
+struct NoTEvoCallback <: TEvoCallback end
 
-    expvalues(cb::SuperfermionCallback)
-    expvalues(cb::SuperfermionCallback, lop::LocalOperator)
-    expvalues(cb::SuperfermionCallback, name::AbstractString)
-
-Retrieve the expectation values of the operators stored in the callback `cb`.  The time
-series of an individual operator `lop` within `cb` can be directly accessed by
-`expvalues(cb, lop)`, where `lop` is either a `LocalOperator` or a string that defines a
-single `LocalOperator`.
-"""
-function expvalues end
-
-expvalues(cb::NoTEvoCallback) = nothing
+apply!(::NoTEvoCallback, args...; kwargs...) = nothing
+callback_dt(::NoTEvoCallback) = 0.0
 
 ### SpecCallback
 
@@ -195,5 +181,3 @@ function apply!(
         end
     end
 end
-
-checkdone!(cb::SpecCallback, args...) = false

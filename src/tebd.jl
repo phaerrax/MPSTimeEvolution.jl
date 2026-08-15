@@ -104,7 +104,7 @@ function tebd1!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
     # change during the evolution as a result of applying the operators.
     # It can change, however, as a consequence of the truncation following the evolution
     # step.
-    compute_norm!(cb, ψₜ, TEBD(); current_time)
+    compute_normalization!(cb, ψₜ, TEBD(); current_time)
 
     for s in 1:nsteps
         stime = @elapsed begin
@@ -114,7 +114,7 @@ function tebd1!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
         # The evolution step is done. Compute the expectation values of the observables.
         apply!(cb, ψₜ, TEBD(); current_time=current_time + dt)
         current_time += dt
-        compute_norm!(cb, ψₜ, TEBD(); current_time=current_time)
+        compute_normalization!(cb, ψₜ, TEBD(); current_time=current_time)
 
         !isnothing(pbar) &&
             ProgressMeter.next!(pbar; showvalues=simulationinfo(ψₜ, current_time, stime))
@@ -183,7 +183,7 @@ function tebd2!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
     # change during the evolution as a result of applying the operators.
     # It can change, however, as a consequence of the truncation following the evolution
     # step.
-    compute_norm!(cb, ψₜ, TEBD(); current_time)
+    compute_normalization!(cb, ψₜ, TEBD(); current_time)
 
     for _ in 1:nsteps_grouped
         stime_merged_steps = @elapsed begin
@@ -229,7 +229,7 @@ function tebd2!(ψₜ::VidalMPS, H::OpSum, dt, tmax; kwargs...)
         # FIXME Does something unpleasant happen if measurement_dt is not an integer
         # multiple of dt?
         apply!(cb, ψₜ, TEBD(); current_time)
-        compute_norm!(cb, ψₜ, TEBD(); current_time)
+        compute_normalization!(cb, ψₜ, TEBD(); current_time)
 
         !isnothing(pbar) &&
             ProgressMeter.next!(pbar; showvalues=simulationinfo(ψₜ, current_time, stime))

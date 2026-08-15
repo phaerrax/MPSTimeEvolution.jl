@@ -34,8 +34,7 @@ include("vidalmps/apply.jl")
 include("itensor.jl")
 include("callback.jl")
 include("localoperator.jl")
-include("expvalue_callback.jl")
-include("superfermion_callback.jl")
+include("measurement_callbacks.jl")
 
 include("utils.jl")
 
