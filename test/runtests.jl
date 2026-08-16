@@ -1,7 +1,12 @@
 using Test, Documenter, MPSTimeEvolution
 using LinearAlgebra, ITensors, ITensorMPS, Observers, CSV, LindbladVectorizedTensors
+using MPI
 
-using MPSTimeEvolution: _sf_translate_sites, _sf_translate_sites_inv, check_vidal_form
+using MPSTimeEvolution:
+    _sf_translate_sites,
+    _sf_translate_sites_inv,
+    check_vidal_form,
+    check_inverse_canonical_form
 
 include("testset_skip.jl")
 
@@ -100,6 +105,41 @@ include("compare_tdvp_methods.jl")
             )
         end
 
+        tdvp2_atol=1e-8
+        @testset "TDVP2 with ordinary MPS (atol=$tdvp2_atol)" begin
+            res_tdvp2 = siam_tdvp2(;
+                dt=dt,
+                tmax=tmax,
+                freqs=freqs,
+                couplings=couplings,
+                check_sites=sites,
+                init=alternate,
+                cutoff=1e-16,
+            )
+
+            @test all(
+                all(isapprox.(r1, r2; atol=tdvp2_atol)) for
+                (r1, r2) in zip(res_tdvp1, res_tdvp2)
+            )
+        end
+
+        @testset "TDVP2 with inverse-canonical MPS (atol=$tdvp2_atol)" begin
+            res_tdvp2_ic = siam_tdvp2_ic(;
+                dt=dt,
+                tmax=tmax,
+                freqs=freqs,
+                couplings=couplings,
+                check_sites=sites,
+                init=alternate,
+                cutoff=1e-16,
+            )
+
+            @test all(
+                all(isapprox.(r1, r2; atol=tdvp2_atol)) for
+                (r1, r2) in zip(res_tdvp1, res_tdvp2_ic)
+            )
+        end
+
         @testset "TDVP1 with superfermion states" begin
             res_tdvp1vec_sf = siam_tdvp1vec_superfermions(;
                 dt=dt,
@@ -163,6 +203,39 @@ end
 include("joint_tdvp.jl")
 @testset "Joint TDVP1 method" begin
     @test siam_check_jointtdvp1()
+end
+
+@testset "Parallel TDV2" begin
+    np = 4
+    serial_io_file = tempname()
+    parallel_io_file = tempname()
+    obs = ["σz($n)" for n in 1:4]
+
+    prog = run(
+        `mpiexecjl -np $np $(Base.julia_cmd()) mpi_tdvp2.jl $parallel_io_file $serial_io_file`,
+    )
+
+    serial = CSV.File(serial_io_file)
+    serial_norm = complex.(serial.Norm_re, serial.Norm_im)
+    serial_results = [
+        complex.(serial[op * "_re"], serial[op * "_im"]) ./ serial_norm for op in obs
+    ]
+
+    parallel = CSV.File(parallel_io_file)
+    parallel_norm = complex.(parallel.Norm_re, parallel.Norm_im)
+    parallel_results = [
+        complex.(parallel[op * "_re"], parallel[op * "_im"]) ./ parallel_norm for op in obs
+    ]
+
+    nsteps = length(serial_norm)
+    # Test whether all measured observables give the same results.
+    @test success(prog) && serial_norm ≈ ones(nsteps)
+    @test success(prog) && parallel_norm ≈ ones(nsteps)
+
+    # Test whether all measured observables give the same results.
+    @test success(prog) && all(zip(serial_results, parallel_results)) do (s, p)
+        s ≈ p
+    end
 end
 
 include("tdvp_sum_mpos.jl")
@@ -235,6 +308,8 @@ end
         @test dot(λ * x_vidal, y_vidal) ≈ conj(λ) * dot(x_vidal, y_vidal)
         @test dot(x_vidal, x_vidal - y_vidal) ≈
             dot(x_vidal, x_vidal) - dot(x_vidal, y_vidal)
+
+        @test norm(normalize(convert(InverseCanonicalMPS, 2x))) ≈ 1
     end
 
     @testset "Application of one-site unitary operators" begin
@@ -403,5 +478,126 @@ end
         norm_init = norm(vv)
         tebd2!(vv, h, dt, tmax; cutoff=1e-12, maxdim=10, progress=false, callback=cb);
         @test norm(vv) ≈ norm_init
+    end
+end
+
+@testset verbose=true "Inverse-canonical MPSs" begin
+    N = 8
+    s = siteinds("S=1/2", N)
+    x = random_mps(ComplexF64, s; linkdims=4)
+    x_ican = convert(InverseCanonicalMPS, x)
+    @test MPSTimeEvolution.check_inverse_canonical_form(x_ican)
+    @test MPSTimeEvolution.check_inverse_canonical_form(InverseCanonicalMPS(s, "Up"))
+
+    @testset "Conversion to/from MPS" begin
+        @test all(1:N) do n
+            v = convert(MPS, x_ican; ortho_center=n)
+            norm(v) ≈ inner(v[n], v[n])
+        end
+    end
+
+    @testset "Truncation" begin
+        s′ = siteinds("Boson", N; dim=6)
+        # We need bigger site indices so that we have more room for truncation.
+        z = random_mps(ComplexF64, s′; linkdims=4)
+        z_ican = convert(InverseCanonicalMPS, z)
+        maxdim = 10
+        cutoff = 1e-8
+        @test truncate(z; maxdim=maxdim, site_range=3:4) ≈
+            convert(MPS, truncate(z_ican; maxdim=maxdim, site_range=3:4))
+        @test truncate(z; cutoff=cutoff) ≈ convert(MPS, truncate(z_ican; cutoff=cutoff))
+        @test truncate(z; maxdim=maxdim) ≈ convert(MPS, truncate(z_ican; maxdim=maxdim))
+    end
+
+    y = random_mps(ComplexF64, s; linkdims=4)
+    y_ican = convert(InverseCanonicalMPS, y)
+    @testset "Arithmetic operations" begin
+        @test x_ican + y_ican - x_ican ≈ y_ican
+
+        xy_ican_sum_dm = +(x_ican, y_ican; alg="densitymatrix")
+        xy_ican_sum_ds = +(x_ican, y_ican; alg="directsum")
+        @test xy_ican_sum_dm ≈ xy_ican_sum_ds
+        @test check_inverse_canonical_form(xy_ican_sum_dm)
+
+        @test_broken check_inverse_canonical_form(xy_ican_sum_ds; verbose=false)
+        @test check_inverse_canonical_form(canonicalize(xy_ican_sum_ds))
+
+        yy_ican = deepcopy(y_ican)
+        yy_ican.site_tensors[2] *= 2
+        # We cannot multiply `y_ican` by two directly (it is not allowed by the * operation)
+        # but we can do what we want with the individual tensors. This should break the IC
+        # gauge.
+        @test_broken check_inverse_canonical_form(yy_ican; verbose=false)
+        @test check_inverse_canonical_form(canonicalize(yy_ican))
+    end
+
+    @testset "Inner product and norm" begin
+        @test dot(x_ican, y_ican) ≈ conj(dot(y_ican, x_ican))
+        @test dot(x_ican, y_ican) ≈ dot(x, y)
+        @test norm(x_ican) ≈ norm(x)
+        @test norm(-x_ican) ≈ norm(x_ican)
+
+        λ = cis(rand())
+        @test dot(λ * x_ican, y_ican) ≈ conj(λ) * dot(x_ican, y_ican)
+        @test dot(x_ican, x_ican - y_ican) ≈ dot(x_ican, x_ican) - dot(x_ican, y_ican)
+
+        @test norm(normalize(convert(InverseCanonicalMPS, 2x))) ≈ 1
+    end
+
+    @testset "Application of one-site unitary operators" begin
+        a = op("RandomUnitary", s, 1)
+        @test check_inverse_canonical_form(apply(a, x_ican))
+        @test convert(MPS, apply(a, x_ican)) ≈ apply(a, x)
+
+        b = op("RandomUnitary", s, 3)
+        @test check_inverse_canonical_form(apply(b, x_ican))
+        @test convert(MPS, apply(b, x_ican)) ≈ apply(b, x)
+
+        c = op("RandomUnitary", s, N)
+        @test check_inverse_canonical_form(apply(c, x_ican))
+        @test convert(MPS, apply(c, x_ican)) ≈ apply(c, x)
+    end
+
+    @testset "Application of two-site unitary operators" begin
+        a = op("RandomUnitary", s, 1, 2)
+        @test check_inverse_canonical_form(apply(a, x_ican))
+        @test convert(MPS, apply(a, x_ican)) ≈ apply(a, x)
+
+        b = op("RandomUnitary", s, 2, 3)
+        @test check_inverse_canonical_form(apply(b, x_ican))
+        @test convert(MPS, apply(b, x_ican)) ≈ apply(b, x)
+
+        c = op("RandomUnitary", s, N-1, N)
+        @test check_inverse_canonical_form(apply(c, x_ican))
+        @test convert(MPS, apply(c, x_ican)) ≈ apply(c, x)
+
+        d = op("RandomUnitary", s, 2, 4)
+        # The tensor indices are not contiguous site indices. The apply function should
+        # throw an error in this case.
+        @test_throws ErrorException apply(d, x_ican)
+    end
+
+    @testset "Application of three-site unitary operators" begin
+        a = op("RandomUnitary", s, 1, 2, 3)
+        @test check_inverse_canonical_form(apply(a, x_ican))
+        @test convert(MPS, apply(a, x_ican)) ≈ apply(a, x)
+
+        b = op("RandomUnitary", s, 2, 3, 4)
+        @test check_inverse_canonical_form(apply(b, x_ican))
+        @test convert(MPS, apply(b, x_ican)) ≈ apply(b, x)
+
+        c = op("RandomUnitary", s, N-2, N-1, N)
+        @test check_inverse_canonical_form(apply(c, x_ican))
+        @test convert(MPS, apply(c, x_ican)) ≈ apply(c, x)
+    end
+
+    @testset "Expectation values" begin
+        @test expect(x, "S²") ≈ expect(x_ican, "S²")
+
+        m = [1 im; 1+1im 0]
+        @test expect(x, m) ≈ expect(x_ican, m)
+
+        @test expect(y, "ProjDn"; sites=3:N) ≈ expect(y_ican, "ProjDn"; sites=3:N)
+        @test expect(x, ["Sx", "Sy", "Sz"]) ≈ expect(x_ican, ["Sx", "Sy", "Sz"])
     end
 end

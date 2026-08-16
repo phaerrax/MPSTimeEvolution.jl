@@ -78,6 +78,10 @@ function adaptiveadjtdvp1vec!(
     )
 end
 
+function tdvp2!(state::Union{MPS,InverseCanonicalMPS}, H, dt, tmax; kwargs...)
+    return tdvp2!(tdvp_solver(; kwargs...), state, H, dt, tmax; kwargs...)
+end
+
 """
     function tdvp_site_update!(
         solver, PH, state::MPS, i::Int, dt;

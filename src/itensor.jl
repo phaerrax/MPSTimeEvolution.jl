@@ -250,7 +250,7 @@ function recompute!(P::ProjMPOSum, v::MPS, n::Int)
 end
 
 """
-    maxlinkdims(v::MPS[, maxbonddim])
+    maxlinkdims(v::Union{MPS,ExplicitBondMPS}[, maxbonddim])
 
 Return a vector containing the maximum bond dimensions that the MPS `v` can have, taking
 into account both the physical dimension of its sites and (if provided) a manually set upper
@@ -265,11 +265,22 @@ function maxlinkdims(v::MPS)
     # Once we cap the values at `maxbonddim`, we can safely exponentiate.
     sitedims = dim.(siteinds(only, v))
     logdims = (1:length(v)) .* log2.(sitedims)
-    minlogdims = min.(logdims[1:(end - 1)], reverse(logdims[1:(end - 1)]))
+    reverse_logdims = reverse(1:length(v)) .* log2.(sitedims)
+    minlogdims = min.(logdims[1:(end - 1)], reverse_logdims[1:(end - 1)])
     return round.(Int, 2 .^ minlogdims)
 end
 
-maxlinkdims(v::MPS, maxbonddim::Int) = min.(maxlinkdims(v), Ref(maxbonddim))
+function maxlinkdims(v::ExplicitBondMPS)
+    sitedims = dim.(siteinds(v))
+    logdims = (1:nsites(v)) .* log2.(sitedims)  # <-- `nsites` instead of `length`
+    reverse_logdims = reverse(1:nsites(v)) .* log2.(sitedims)
+    minlogdims = min.(logdims[1:(end - 1)], reverse_logdims[1:(end - 1)])
+    return round.(Int, 2 .^ minlogdims)
+end
+
+function maxlinkdims(v::Union{MPS,ExplicitBondMPS}, maxbonddim::Int)
+    return min.(maxlinkdims(v), Ref(maxbonddim))
+end
 
 """
     maxlinkdims(st::AbstractString, N[, maxbonddim])

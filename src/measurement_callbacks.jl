@@ -156,13 +156,13 @@ end
 
 ### apply! methods
 
-# Standard MPS + TDVP1 method: meant to be applied at every site along the final sweep of a
+# Standard MPS + TDVP method: meant to be applied at every site along the final sweep of a
 # time step. It measures expectation values only for observables specific to that site (thus
 # it needs the `site` keyword argument).
 function apply!(
     cb::ExpValueCallback,
     state::MPS,
-    alg::TDVP1;
+    alg::Union{TDVP1,TDVP2};
     current_time,
     sweepend,
     sweepdir,
@@ -178,6 +178,28 @@ function apply!(
         if on_schedule
             @debug "Computing expectation values on site $site at t = $current_time"
             measure_localops!(cb, state, site, alg)
+        end
+    end
+
+    return nothing
+end
+
+# TDVP1 & TDVP2 variant for inverse-canonical MPSs.
+function apply!(
+    cb::ExpValueCallback,
+    state::InverseCanonicalMPS,
+    alg::Union{TDVP1,TDVP2};
+    current_time,
+    sweepend,
+    kwargs...,
+)
+    # Since with inverse-canonical MPSs we can compute expectation values in parallel, we
+    # can do everything at the end of the time step.
+    if sweepend
+        on_schedule = register_time!(cb, current_time)
+        if on_schedule
+            @debug "Computing expectation values at t = $current_time"
+            measure_localops!(cb, state, alg)
         end
     end
 
@@ -292,6 +314,45 @@ function measure_localops!(cb::ExpValueCallback, ψ::MPS, site::Int, alg::TDVP1)
     # this function.
     for localop in filter(l -> first(domain(l)) == site, ops(cb))
         push!(measurements(cb)[localop], _expval_while_sweeping(ψ, localop))
+    end
+
+    return nothing
+end
+
+function measure_localops!(cb::ExpValueCallback, state::MPS, b::Int, alg::TDVP2)
+    # When we are sweeping right-to-left, once the block at sites (b, b+1) has been evolved,
+    # the tensor at ψ[b + 1] has completed its evolution within the time step dt.
+    # The MPS is
+    # • left-orthogonal from ψ[1] to ψ[b - 1]
+    # • right-orthogonal from ψ[b] to ψ[end]
+    # so this is a good time to measure observables that are local to site b+1: when
+    # contracting in inner(ψ', A(n), ψ), all the sites left of ψ[b] (excluded) give the
+    # identity, and so do all those right of ψ[b + 1].  The measurement can then be
+    # performed using the tensor composed by only ψ[b] and ψ[b + 1].
+
+    # Operators whose support is contained in `site+1:end` have already been measured in
+    # previous calls of this function.
+    for localop in filter(l -> first(domain(l)) == b+1, ops(cb))
+        push!(measurements(cb)[localop], _expval_while_sweeping(state, localop))
+    end
+    # If b == 1, meaning that the right-to-left sweep has ended, we also measure on the
+    # first site.
+    if b == 1
+        for localop in filter(l -> first(domain(l)) == 1, ops(cb))
+            push!(measurements(cb)[localop], _expval_while_sweeping(state, localop))
+        end
+    end
+    return nothing
+end
+
+# Compute the inner product ⟨ψ, Aψ⟩ for each operator A defined inside the callback object.
+function measure_localops!(
+    cb::ExpValueCallback, state::InverseCanonicalMPS, alg::Union{TDVP1,TDVP2}
+)
+    # In the inverse-canonical gauge, measurements can be performed in parallel; we don't
+    # need to reorthogonalise the MPS each time.
+    Threads.@threads :greedy for localop in ops(cb)
+        push!(measurements(cb)[localop], expect(state, localop))
     end
 
     return nothing
@@ -419,7 +480,10 @@ end
 
 # For standard TDVP/TEBD, we use the norm of the state.
 function compute_normalization!(
-    cb::ExpValueCallback, ψ::Union{MPS,VidalMPS}, alg::Union{TDVP1,TEBD}; current_time
+    cb::ExpValueCallback,
+    ψ::Union{MPS,VidalMPS,InverseCanonicalMPS},
+    alg::Union{TDVP1,TDVP2,TEBD};
+    current_time,
 )
     # No optimisation needed here. We already have efficient algorithms for both standard
     # MPSs and canonical MPSs.

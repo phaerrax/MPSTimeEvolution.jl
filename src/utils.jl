@@ -139,7 +139,7 @@ function writeheaders_stime(times_file)
     return times_handle
 end
 
-function printoutput_data(io_handle, cb, psi::MPS; kwargs...)
+function printoutput_data(io_handle, cb, psi::Union{MPS,ExplicitBondMPS}; kwargs...)
     if !isnothing(io_handle)
         results = measurements(cb)
         data = [measurement_ts(cb)[end]]
@@ -196,7 +196,7 @@ function printoutput_data(io_handle, cb, state1::MPS, state2::MPS; kwargs...)
     return nothing
 end
 
-function printoutput_ranks(ranks_handle, cb, states::MPS...)
+function printoutput_ranks(ranks_handle, cb, states::Union{MPS,ExplicitBondMPS}...)
     if !isnothing(ranks_handle)
         current_time = measurement_ts(cb)[end]
         bonddims = reduce(vcat, ITensorMPS.linkdims(state) for state in states)
@@ -225,7 +225,7 @@ function append_if_not_null(filename::AbstractString, str::AbstractString)
     end
 end
 
-function simulationinfo(x::Union{MPS,VidalMPS}, current_time, stime; digits=3)
+function simulationinfo(x::Union{MPS,ExplicitBondMPS}, current_time, stime; digits=3)
     return () -> [
         ("t", current_time),
         ("Maximum bond dimension", maxlinkdim(x)),
