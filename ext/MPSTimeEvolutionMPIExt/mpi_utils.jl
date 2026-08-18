@@ -252,10 +252,21 @@ function MPSTimeEvolution.simulationinfo(
 end
 
 function MPSTimeEvolution.writeheaders_data(io_file, comm::MPI.Comm, cb; root, kwargs...)
+    # This function needs to be called by all workers, not just root, so that
+    # `printoutput_data` and `printoutput_ranks` can work correctly with their internal
+    # calls to MPI methods --- we need all workers to have `io_handle` and `ranks_handle`
+    # not to be nothing.  However we also don't want every worker to actually open the
+    # output files, since that can lead to race conditions.  As a compromise, set the
+    # non-root handles to `devnull`: this way the handle is never `nothing`, but only root
+    # actually manages the output file.  Moreover, `devnull` doesn't need to be closed at
+    # the end of the main function.
+    # (The actual printing is unaffected since it happens only if `isroot` is true, so
+    # nothing gets actually printed to `devnull`, but it wouldn't be an issue since calling
+    # `println` or `flush` on `devnull` doesn't do anything.)
     io_handle = nothing
     isroot=(MPI.Comm_rank(comm) == root)
     if !isnothing(io_file)
-        io_handle = open(io_file, "w")
+        io_handle = isroot ? open(io_file, "w") : devnull
 
         columnheaders = ["time"]
 
@@ -281,10 +292,11 @@ function MPSTimeEvolution.writeheaders_data(io_file, comm::MPI.Comm, cb; root, k
 end
 
 function MPSTimeEvolution.writeheaders_ranks(ranks_file, comm::MPI.Comm, Ns::Int...; root)
+    # (See `writeheaders_data` above.)
     ranks_handle = nothing
     isroot=(MPI.Comm_rank(comm) == root)
     if !isnothing(ranks_file)
-        ranks_handle = open(ranks_file, "w")
+        ranks_handle = isroot ? open(ranks_file, "w") : devnull
 
         columnheaders = ["time"]
 
