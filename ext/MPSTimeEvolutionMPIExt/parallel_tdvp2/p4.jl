@@ -10,9 +10,12 @@
 # Process 4
 # =========
 function tdvp2_parallel_sweep_4p!(
-    ::Val{4}, comm::MPI.Comm, site_ts, bond_ts, PH, dt; maxdim, cutoff, current_time
+    ::Val{4}, partition::MPSPartition, dt, comm::MPI.Comm; maxdim, cutoff, current_time
 )
-    site_range = eachindex(site_ts)
+    site_ts = partition.site_tensors
+    bond_ts = partition.bond_tensors
+    PH = partition.PH
+    site_range = partition.range
 
     truncerr = 0.0
 
@@ -110,5 +113,5 @@ function tdvp2_parallel_sweep_4p!(
     end
     @assert bond+1 == last(site_range)
 
-    return site_ts, bond_ts, PH, truncerr
+    return partition, truncerr
 end
